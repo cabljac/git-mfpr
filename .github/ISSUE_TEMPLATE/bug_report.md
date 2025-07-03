@@ -1,8 +1,8 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: ''
-labels: 'bug'
+title: '[BUG] '
+labels: bug
 assignees: ''
 
 ---
@@ -12,23 +12,29 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+1. Run command '...'
+2. With these flags '...'
+3. See error
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
 **Actual behavior**
-A clear and concise description of what actually happened.
+What actually happened instead.
+
+**Error output**
+```
+Paste any error messages or unexpected output here
+```
 
 **Environment (please complete the following information):**
  - OS: [e.g. macOS, Linux, Windows]
- - Go version: [e.g. 1.22.0]
- - git-mfpr version: [e.g. 0.1.0]
- - Git version: [e.g. 2.40.0]
- - GitHub CLI version: [e.g. 2.32.0]
+ - Version: [e.g. v1.0.0]
+ - Go version: [e.g. 1.21]
+ - Installation method: [e.g. brew, go install, binary]
 
 **Additional context**
-Add any other context about the problem here, including error messages, logs, or screenshots. 
+Add any other context about the problem here.
+
+**Possible solution**
+If you have an idea of how to fix this issue, please describe it here. 

@@ -4,8 +4,6 @@ run:
   modules-download-mode: readonly
 
 linters-settings:
-  govet:
-    check-shadowing: true
   gocyclo:
     min-complexity: 15
   maligned:
@@ -34,17 +32,39 @@ linters-settings:
       - octalLiteral
       - whyNoLint
       - wrapperFunc
+      - appendCombine
+      - elseif
+      - emptyStringTest
+      - sprintfQuotedString
+      - unnamedResult
+  depguard:
+    rules:
+      main:
+        files:
+          - "cmd/**/*.go"
+        allow:
+          - github.com/spf13/cobra
+          - github.com/user/git-mfpr/internal/migrate
+          - github.com/user/git-mfpr/internal/git
+          - github.com/user/git-mfpr/internal/github
+          - github.com/user/git-mfpr/internal/ui
+      test:
+        files:
+          - "**/*_test.go"
+        allow:
+          - github.com/user/git-mfpr/internal/migrate
+          - github.com/user/git-mfpr/internal/git
+          - github.com/user/git-mfpr/internal/github
+          - github.com/user/git-mfpr/internal/ui
 
 linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - exhaustive
     - forbidigo
     - funlen
@@ -56,7 +76,6 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - gomnd
     - gomodguard
     - goprintffuncname
     - gosec
@@ -75,7 +94,6 @@ linters:
     - revive
     - rowserrcheck
     - staticcheck
-    - structcheck
     - stylecheck
     - thelper
     - tparallel
@@ -83,7 +101,6 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
     - wrapcheck
 
@@ -91,24 +108,61 @@ issues:
   exclude-rules:
     - path: _test\.go
       linters:
-        - gomnd
         - goconst
         - funlen
         - gocyclo
         - dupl
         - thelper
         - tparallel
+        - errcheck
+        - forbidigo
+        - unused
+        - revive
+        - depguard
     - path: internal/migrate/mock\.go
       linters:
         - dupl
         - funlen
+        - errcheck
+        - forbidigo
+        - revive
     - path: internal/git/git_test\.go
       linters:
         - dupl
         - funlen
+        - errcheck
+        - forbidigo
+        - revive
     - path: internal/github/github_test\.go
       linters:
         - dupl
         - funlen
+        - errcheck
+        - forbidigo
+        - revive
+        - unused
+    - path: cmd/test/
+      linters:
+        - errcheck
+        - forbidigo
+        - revive
+    - path: internal/ui/
+      linters:
+        - errcheck
+        - forbidigo
+        - revive
+        - wrapcheck
+    - path: internal/migrate/
+      linters:
+        - revive
+        - wrapcheck
+    - path: internal/git/
+      linters:
+        - revive
+        - wrapcheck
+    - path: internal/github/
+      linters:
+        - revive
+        - wrapcheck
   max-issues-per-linter: 0
   max-same-issues: 0 

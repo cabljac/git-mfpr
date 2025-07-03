@@ -56,7 +56,6 @@ fmt-check: ## Check if code is formatted
 install-tools: ## Install development tools
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/tools/cmd/goimports@latest
-	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 
 # Cleanup
 clean: ## Clean build artifacts
@@ -86,10 +85,6 @@ goreleaser-check: ## Check GoReleaser configuration
 goreleaser-release: ## Create a new release (requires tag)
 	goreleaser release --rm-dist
 
-# Security
-security: ## Run security scan
-	gosec ./...
-
 # Dependencies
 deps: ## Download dependencies
 	go mod download
@@ -101,4 +96,4 @@ deps-tidy: ## Tidy dependencies
 dev: deps fmt lint test ## Run full development workflow
 
 # CI simulation
-ci: deps fmt-check lint test-race test-coverage security ## Run CI checks locally
+ci: deps fmt-check lint test-race test-coverage ## Run CI checks locally
