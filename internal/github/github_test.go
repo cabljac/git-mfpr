@@ -1,39 +1,50 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 )
 
-// mockCommand is used to mock exec.Command for testing
 var mockCommand = exec.Command
 
 func TestClient_IsGHInstalled(t *testing.T) {
+	ctx := context.Background()
 	client := New()
 
-	// This test assumes gh is installed in the test environment
-	// In a real test suite, we would mock exec.Command
-	err := client.IsGHInstalled()
-	
-	// Check if gh is actually installed
+	err := client.IsGHInstalled(ctx)
+
 	if _, checkErr := exec.LookPath("gh"); checkErr != nil {
-		// gh is not installed, so we expect an error
 		if err == nil {
 			t.Error("IsGHInstalled() should return error when gh is not installed")
 		}
+		if _, ok := err.(*ErrGHNotInstalled); !ok {
+			t.Errorf("Expected ErrGHNotInstalled, got %T", err)
+		}
 	} else {
-		// gh is installed, so we expect no error
 		if err != nil {
 			t.Errorf("IsGHInstalled() error = %v", err)
 		}
 	}
 }
 
+func TestClient_IsGHInstalled_WithTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client := NewWithOptions(WithTimeout(5 * time.Second))
+	err := client.IsGHInstalled(ctx)
+
+	if err != nil && !isErrGHNotInstalled(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 func TestPRInfoJSON(t *testing.T) {
-	// Test JSON parsing
 	jsonData := `{
 		"number": 123,
 		"title": "Fix memory leak",
@@ -54,7 +65,6 @@ func TestPRInfoJSON(t *testing.T) {
 		t.Fatalf("Failed to unmarshal PR data: %v", err)
 	}
 
-	// Verify fields
 	if pr.Number != 123 {
 		t.Errorf("Number = %d, want 123", pr.Number)
 	}
@@ -69,54 +79,79 @@ func TestPRInfoJSON(t *testing.T) {
 	}
 }
 
-// TestGetPR_ErrorHandling tests error handling in GetPR
 func TestGetPR_ErrorHandling(t *testing.T) {
-	// Save original PATH
+	ctx := context.Background()
+
 	originalPath := os.Getenv("PATH")
 	defer os.Setenv("PATH", originalPath)
 
-	// Test with gh not in PATH
 	os.Setenv("PATH", "")
-	
+
 	client := New()
-	_, err := client.GetPR("owner", "repo", 123)
-	
+	_, err := client.GetPR(ctx, "owner", "repo", 123)
+
 	if err == nil {
 		t.Error("GetPR() should return error when gh is not installed")
 	}
-	
-	expectedError := "gh CLI is not installed"
-	if err != nil && !containsString(err.Error(), expectedError) {
-		t.Errorf("GetPR() error = %v, want error containing %q", err, expectedError)
+
+	if !isErrGHNotInstalled(err) {
+		t.Errorf("Expected ErrGHNotInstalled, got %T: %v", err, err)
 	}
 }
 
-// Helper function
+func TestNewWithOptions(t *testing.T) {
+	client := NewWithOptions(WithTimeout(10 * time.Second))
+
+	if client == nil {
+		t.Error("NewWithOptions() returned nil")
+	}
+}
+
+func TestPRResult(t *testing.T) {
+	pr := &PRInfo{Number: 123, Title: "Test PR"}
+	result := &PRResult{PR: pr, Error: nil}
+
+	if !result.IsSuccess() {
+		t.Error("IsSuccess() should return true for successful result")
+	}
+
+	if result.IsError() {
+		t.Error("IsError() should return false for successful result")
+	}
+
+	errResult := &PRResult{PR: nil, Error: &ErrPRNotFound{Number: 123, Owner: "owner", Repo: "repo"}}
+
+	if errResult.IsSuccess() {
+		t.Error("IsSuccess() should return false for error result")
+	}
+
+	if !errResult.IsError() {
+		t.Error("IsError() should return true for error result")
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(substr) > 0 && len(s) >= len(substr) && s[:len(substr)] == substr
 }
 
-// Integration test that requires gh CLI and network access
+func isErrGHNotInstalled(err error) bool {
+	_, ok := err.(*ErrGHNotInstalled)
+	return ok
+}
+
 func TestIntegration_GetPR(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
 
-	// Check if gh is installed
 	if _, err := exec.LookPath("gh"); err != nil {
 		t.Skip("gh CLI not installed, skipping integration test")
 	}
 
-	// This would test against a real GitHub PR
-	// For unit tests, we're skipping this
 	t.Skip("GetPR integration test requires real GitHub repository")
 }
 
-// Test data for various error scenarios
 func TestGetPR_ParseErrors(t *testing.T) {
-	// This test would require mocking exec.Command to simulate different gh outputs
-	// For now, we're testing the basic structure
-	
 	tests := []struct {
 		name    string
 		output  string
@@ -155,7 +190,6 @@ func TestGetPR_ParseErrors(t *testing.T) {
 	}
 }
 
-// Benchmark for JSON parsing
 func BenchmarkPRInfoParsing(b *testing.B) {
 	jsonData := `{
 		"number": 123,
@@ -178,16 +212,28 @@ func BenchmarkPRInfoParsing(b *testing.B) {
 	}
 }
 
-// Example usage
 func ExampleClient_GetPR() {
+	ctx := context.Background()
 	client := New()
-	
-	// Example of getting a PR (would require gh CLI and network)
-	pr, err := client.GetPR("owner", "repo", 123)
+
+	pr, err := client.GetPR(ctx, "owner", "repo", 123)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("PR #%d: %s by @%s\n", pr.Number, pr.Title, pr.Author)
+}
+
+func ExampleNewWithOptions() {
+	ctx := context.Background()
+	client := NewWithOptions(WithTimeout(10 * time.Second))
+
+	pr, err := client.GetPR(ctx, "owner", "repo", 123)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	fmt.Printf("PR #%d: %s\n", pr.Number, pr.Title)
 }

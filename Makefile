@@ -1,106 +1,104 @@
 # git-mfpr Makefile
 
-# Variables
-BINARY_NAME := git-mfpr
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
-DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
-
-# Go commands
-GOCMD := go
-GOBUILD := $(GOCMD) build
-GOTEST := $(GOCMD) test
-GOGET := $(GOCMD) get
-GOFMT := $(GOCMD) fmt
-GOVET := $(GOCMD) vet
-GOMOD := $(GOCMD) mod
-
-# Directories
-CMD_DIR := ./cmd/git-mfpr
-DIST_DIR := ./dist
-
-.PHONY: all build test clean fmt vet tidy run help install
+.PHONY: help build test lint clean install-tools release
 
 # Default target
-all: test build
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Build the binary
-build:
-	@echo "Building $(BINARY_NAME) $(VERSION)..."
-	@$(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) $(CMD_DIR)
-	@echo "Build complete: ./$(BINARY_NAME)"
+# Build targets
+build: ## Build the git-mfpr binary
+	go build -o bin/git-mfpr ./cmd/git-mfpr/
 
-# Build for multiple platforms
-build-all: clean
-	@echo "Building for multiple platforms..."
-	@mkdir -p $(DIST_DIR)
-	
-	@echo "Building for macOS (amd64)..."
-	@GOOS=darwin GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 $(CMD_DIR)
-	
-	@echo "Building for macOS (arm64)..."
-	@GOOS=darwin GOARCH=arm64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 $(CMD_DIR)
-	
-	@echo "Building for Linux (amd64)..."
-	@GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 $(CMD_DIR)
-	
-	@echo "Building for Linux (arm64)..."
-	@GOOS=linux GOARCH=arm64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 $(CMD_DIR)
-	
-	@echo "Building for Windows (amd64)..."
-	@GOOS=windows GOARCH=amd64 $(GOBUILD) -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe $(CMD_DIR)
-	
-	@echo "All builds complete in $(DIST_DIR)/"
+build-test: ## Build the test binary
+	go build -o bin/test ./cmd/test/
 
-# Run tests
-test:
-	@echo "Running tests..."
-	@$(GOTEST) -v ./...
+build-all: ## Build all binaries
+	mkdir -p bin
+	go build -o bin/git-mfpr ./cmd/git-mfpr/
+	go build -o bin/test ./cmd/test/
 
-# Clean build artifacts
-clean:
-	@echo "Cleaning..."
-	@rm -f $(BINARY_NAME)
-	@rm -rf $(DIST_DIR)
-	@echo "Clean complete"
+# Test targets
+test: ## Run tests
+	go test -v ./...
 
-# Format code
-fmt:
-	@echo "Formatting code..."
-	@$(GOFMT) ./...
+test-race: ## Run tests with race detection
+	go test -v -race ./...
 
-# Run go vet
-vet:
-	@echo "Running go vet..."
-	@$(GOVET) ./...
+test-coverage: ## Run tests with coverage
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
 
-# Update dependencies
-tidy:
-	@echo "Tidying dependencies..."
-	@$(GOMOD) tidy
+test-bench: ## Run benchmarks
+	go test -bench=. -benchmem ./...
 
-# Run the binary with test arguments
-run: build
-	@echo "Running $(BINARY_NAME)..."
-	@./$(BINARY_NAME) 123 --dry-run
+# Linting and formatting
+lint: ## Run golangci-lint
+	golangci-lint run
 
-# Install the binary to GOPATH/bin
-install: build
-	@echo "Installing $(BINARY_NAME) to $(GOPATH)/bin..."
-	@cp $(BINARY_NAME) $(GOPATH)/bin/
-	@echo "Installation complete"
+lint-fix: ## Run golangci-lint with auto-fix
+	golangci-lint run --fix
 
-# Help target
-help:
-	@echo "Available targets:"
-	@echo "  make build      - Build the binary for current platform"
-	@echo "  make build-all  - Build binaries for all supported platforms"
-	@echo "  make test       - Run tests"
-	@echo "  make clean      - Clean build artifacts"
-	@echo "  make fmt        - Format code"
-	@echo "  make vet        - Run go vet"
-	@echo "  make tidy       - Update dependencies"
-	@echo "  make run        - Build and run with test arguments"
-	@echo "  make install    - Install binary to GOPATH/bin"
-	@echo "  make help       - Show this help message"
+fmt: ## Format code with gofmt
+	go fmt ./...
+
+fmt-check: ## Check if code is formatted
+	@if [ -n "$$(gofmt -l .)" ]; then \
+		echo "Code is not formatted. Run 'make fmt' to fix."; \
+		exit 1; \
+	fi
+
+# Development tools
+install-tools: ## Install development tools
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install golang.org/x/tools/cmd/goimports@latest
+	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+# Cleanup
+clean: ## Clean build artifacts
+	rm -rf bin/
+	rm -rf dist/
+	rm -f coverage.out coverage.html
+
+# Release targets
+release-build: ## Build release binaries
+	mkdir -p dist
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/git-mfpr-linux-amd64 ./cmd/git-mfpr/
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/git-mfpr-linux-arm64 ./cmd/git-mfpr/
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/git-mfpr-darwin-amd64 ./cmd/git-mfpr/
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/git-mfpr-darwin-arm64 ./cmd/git-mfpr/
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/git-mfpr-windows-amd64.exe ./cmd/git-mfpr/
+
+# GoReleaser targets
+goreleaser-snapshot: ## Build snapshot release locally
+	goreleaser release --snapshot --rm-dist --skip-publish
+
+goreleaser-build: ## Build release locally
+	goreleaser build --snapshot --rm-dist
+
+goreleaser-check: ## Check GoReleaser configuration
+	goreleaser check
+
+goreleaser-release: ## Create a new release (requires tag)
+	goreleaser release --rm-dist
+
+# Security
+security: ## Run security scan
+	gosec ./...
+
+# Dependencies
+deps: ## Download dependencies
+	go mod download
+
+deps-tidy: ## Tidy dependencies
+	go mod tidy
+
+# Development workflow
+dev: deps fmt lint test ## Run full development workflow
+
+# CI simulation
+ci: deps fmt-check lint test-race test-coverage security ## Run CI checks locally

@@ -9,7 +9,7 @@ git-mfpr
 # Test binary, built with `go test -c`
 *.test
 
-# Output of the go coverage tool
+# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
 # Dependency directories
@@ -31,6 +31,11 @@ build/
 
 # OS specific files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Environment files
@@ -40,3 +45,17 @@ Thumbs.db
 # Config files (except examples)
 .git-mfpr.yml
 !.git-mfpr.example.yml
+
+# Build artifacts
+bin/
+
+# GoReleaser
+dist/
+*.tar.gz
+*.zip
+
+# Coverage reports
+coverage.out
+coverage.html
+
+CLAUDE.md

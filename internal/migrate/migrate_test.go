@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,60 +11,78 @@ import (
 	"github.com/user/git-mfpr/internal/github"
 )
 
-// Mock implementations for testing
 type mockGit struct {
-	currentRepoFunc func() (string, string, error)
-	hasBranchFunc   func(string) bool
-	checkoutFunc    func(string) error
-	pullFunc        func(string, string) error
-	pushFunc        func(string, string) error
+	currentRepoFunc func(context.Context) (string, string, error)
+	hasBranchFunc   func(context.Context, string) bool
+	checkoutFunc    func(context.Context, string) error
+	pullFunc        func(context.Context, string, string) error
+	pushFunc        func(context.Context, string, string) error
 }
 
-func (m *mockGit) CurrentRepo() (string, string, error) {
+func (m *mockGit) CurrentRepo(ctx context.Context) (string, string, error) {
 	if m.currentRepoFunc != nil {
-		return m.currentRepoFunc()
+		return m.currentRepoFunc(ctx)
 	}
 	return "testowner", "testrepo", nil
 }
 
-func (m *mockGit) HasBranch(name string) bool {
+func (m *mockGit) HasBranch(ctx context.Context, name string) bool {
 	if m.hasBranchFunc != nil {
-		return m.hasBranchFunc(name)
+		return m.hasBranchFunc(ctx, name)
 	}
 	return false
 }
 
-func (m *mockGit) Checkout(branch string) error {
+func (m *mockGit) Checkout(ctx context.Context, branch string) error {
 	if m.checkoutFunc != nil {
-		return m.checkoutFunc(branch)
+		return m.checkoutFunc(ctx, branch)
 	}
 	return nil
 }
 
-func (m *mockGit) Pull(remote, branch string) error {
+func (m *mockGit) Pull(ctx context.Context, remote, branch string) error {
 	if m.pullFunc != nil {
-		return m.pullFunc(remote, branch)
+		return m.pullFunc(ctx, remote, branch)
 	}
 	return nil
 }
 
-func (m *mockGit) Push(remote, branch string) error {
+func (m *mockGit) Push(ctx context.Context, remote, branch string) error {
 	if m.pushFunc != nil {
-		return m.pushFunc(remote, branch)
+		return m.pushFunc(ctx, remote, branch)
 	}
 	return nil
 }
 
-func (m *mockGit) CurrentBranch() (string, error) { return "main", nil }
-func (m *mockGit) DeleteBranch(name string) error { return nil }
-func (m *mockGit) IsInRepo() bool                 { return true }
+func (m *mockGit) CurrentBranch(ctx context.Context) (string, error)   { return "main", nil }
+func (m *mockGit) DeleteBranch(ctx context.Context, name string) error { return nil }
+func (m *mockGit) IsInRepo(ctx context.Context) bool                   { return true }
+
+func (m *mockGit) CurrentBranchResult(ctx context.Context) *git.BranchResult {
+	return &git.BranchResult{Branch: "main"}
+}
+func (m *mockGit) CurrentRepoResult(ctx context.Context) *git.RepoResult {
+	return &git.RepoResult{Owner: "testowner", Repo: "testrepo"}
+}
+func (m *mockGit) CheckoutResult(ctx context.Context, branch string) *git.OperationResult {
+	return &git.OperationResult{Success: true}
+}
+func (m *mockGit) PullResult(ctx context.Context, remote, branch string) *git.OperationResult {
+	return &git.OperationResult{Success: true}
+}
+func (m *mockGit) PushResult(ctx context.Context, remote, branch string) *git.OperationResult {
+	return &git.OperationResult{Success: true}
+}
+func (m *mockGit) DeleteBranchResult(ctx context.Context, name string) *git.OperationResult {
+	return &git.OperationResult{Success: true}
+}
 
 type mockGitHub struct {
 	getPRFunc      func(string, string, int) (*github.PRInfo, error)
 	checkoutPRFunc func(int, string) error
 }
 
-func (m *mockGitHub) GetPR(owner, repo string, number int) (*github.PRInfo, error) {
+func (m *mockGitHub) GetPR(ctx context.Context, owner, repo string, number int) (*github.PRInfo, error) {
 	if m.getPRFunc != nil {
 		return m.getPRFunc(owner, repo, number)
 	}
@@ -79,17 +98,16 @@ func (m *mockGitHub) GetPR(owner, repo string, number int) (*github.PRInfo, erro
 	}, nil
 }
 
-func (m *mockGitHub) CheckoutPR(number int, branch string) error {
+func (m *mockGitHub) CheckoutPR(ctx context.Context, number int, branch string) error {
 	if m.checkoutPRFunc != nil {
 		return m.checkoutPRFunc(number, branch)
 	}
 	return nil
 }
 
-func (m *mockGitHub) CreatePR(title, body, base string) error { return nil }
-func (m *mockGitHub) IsGHInstalled() error                    { return nil }
+func (m *mockGitHub) CreatePR(ctx context.Context, title, body, base string) error { return nil }
+func (m *mockGitHub) IsGHInstalled(ctx context.Context) error                      { return nil }
 
-// Test helper to create a test client
 func newTestClient(git git.Git, github github.GitHub) *Client {
 	return &Client{
 		git:     git,
@@ -181,7 +199,7 @@ func TestParsePRRef(t *testing.T) {
 
 func TestParsePRRef_CurrentRepoError(t *testing.T) {
 	mockGit := &mockGit{
-		currentRepoFunc: func() (string, string, error) {
+		currentRepoFunc: func(ctx context.Context) (string, string, error) {
 			return "", "", errors.New("not in git repo")
 		},
 	}
@@ -198,6 +216,7 @@ func TestParsePRRef_CurrentRepoError(t *testing.T) {
 }
 
 func TestGetPRInfo(t *testing.T) {
+	ctx := context.Background()
 	expectedPR := &github.PRInfo{
 		Number:     123,
 		Title:      "Test PR",
@@ -219,7 +238,7 @@ func TestGetPRInfo(t *testing.T) {
 	}
 
 	client := newTestClient(&mockGit{}, mockGitHub)
-	pr, err := client.GetPRInfo("123")
+	pr, err := client.GetPRInfo(ctx, "123")
 
 	if err != nil {
 		t.Errorf("GetPRInfo() error = %v", err)
@@ -337,14 +356,15 @@ func TestMin(t *testing.T) {
 }
 
 func TestMigratePR_Success(t *testing.T) {
+	ctx := context.Background()
 	events := []Event{}
 	handler := func(event Event) {
 		events = append(events, event)
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(name string) bool {
-			return false // Branch doesn't exist
+		hasBranchFunc: func(ctx context.Context, name string) bool {
+			return false
 		},
 	}
 
@@ -366,18 +386,16 @@ func TestMigratePR_Success(t *testing.T) {
 	client := newTestClient(mockGit, mockGitHub)
 	client.SetEventHandler(handler)
 
-	err := client.MigratePR("123", Options{})
+	err := client.MigratePR(ctx, "123", Options{})
 
 	if err != nil {
 		t.Errorf("MigratePR() error = %v", err)
 	}
 
-	// Check that events were emitted
 	if len(events) == 0 {
 		t.Error("No events were emitted")
 	}
 
-	// Check for specific events
 	hasInfoEvent := false
 	hasSuccessEvent := false
 	for _, event := range events {
@@ -398,6 +416,7 @@ func TestMigratePR_Success(t *testing.T) {
 }
 
 func TestMigratePR_NotFork(t *testing.T) {
+	ctx := context.Background()
 	mockGitHub := &mockGitHub{
 		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
 			return &github.PRInfo{
@@ -405,13 +424,13 @@ func TestMigratePR_NotFork(t *testing.T) {
 				Title:  "Test PR",
 				Author: "testuser",
 				State:  "open",
-				IsFork: false, // Not a fork
+				IsFork: false,
 			}, nil
 		},
 	}
 
 	client := newTestClient(&mockGit{}, mockGitHub)
-	err := client.MigratePR("123", Options{})
+	err := client.MigratePR(ctx, "123", Options{})
 
 	if err == nil {
 		t.Error("MigratePR() should return error for non-fork PR")
@@ -422,6 +441,7 @@ func TestMigratePR_NotFork(t *testing.T) {
 }
 
 func TestMigratePR_ClosedPR(t *testing.T) {
+	ctx := context.Background()
 	mockGitHub := &mockGitHub{
 		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
 			return &github.PRInfo{
@@ -435,7 +455,7 @@ func TestMigratePR_ClosedPR(t *testing.T) {
 	}
 
 	client := newTestClient(&mockGit{}, mockGitHub)
-	err := client.MigratePR("123", Options{})
+	err := client.MigratePR(ctx, "123", Options{})
 
 	if err == nil {
 		t.Error("MigratePR() should return error for closed PR")
@@ -446,9 +466,10 @@ func TestMigratePR_ClosedPR(t *testing.T) {
 }
 
 func TestMigratePR_BranchExists(t *testing.T) {
+	ctx := context.Background()
 	mockGit := &mockGit{
-		hasBranchFunc: func(name string) bool {
-			return true // Branch already exists
+		hasBranchFunc: func(ctx context.Context, name string) bool {
+			return true
 		},
 	}
 
@@ -465,7 +486,7 @@ func TestMigratePR_BranchExists(t *testing.T) {
 	}
 
 	client := newTestClient(mockGit, mockGitHub)
-	err := client.MigratePR("123", Options{})
+	err := client.MigratePR(ctx, "123", Options{})
 
 	if err == nil {
 		t.Error("MigratePR() should return error when branch exists")
@@ -476,13 +497,14 @@ func TestMigratePR_BranchExists(t *testing.T) {
 }
 
 func TestMigratePR_DryRun(t *testing.T) {
+	ctx := context.Background()
 	events := []Event{}
 	handler := func(event Event) {
 		events = append(events, event)
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(name string) bool {
+		hasBranchFunc: func(ctx context.Context, name string) bool {
 			return false
 		},
 	}
@@ -504,13 +526,12 @@ func TestMigratePR_DryRun(t *testing.T) {
 	client := newTestClient(mockGit, mockGitHub)
 	client.SetEventHandler(handler)
 
-	err := client.MigratePR("123", Options{DryRun: true})
+	err := client.MigratePR(ctx, "123", Options{DryRun: true})
 
 	if err != nil {
 		t.Errorf("MigratePR() error = %v", err)
 	}
 
-	// Check for dry run commands
 	hasDryRunCommand := false
 	for _, event := range events {
 		if event.Type == "command" && strings.Contains(event.Message, "Would execute:") {
@@ -525,9 +546,10 @@ func TestMigratePR_DryRun(t *testing.T) {
 }
 
 func TestMigratePR_CustomBranchName(t *testing.T) {
+	ctx := context.Background()
 	mockGit := &mockGit{
-		hasBranchFunc: func(name string) bool {
-			return name == "custom-branch" // Only this branch exists
+		hasBranchFunc: func(ctx context.Context, name string) bool {
+			return name == "custom-branch"
 		},
 	}
 
@@ -544,7 +566,7 @@ func TestMigratePR_CustomBranchName(t *testing.T) {
 	}
 
 	client := newTestClient(mockGit, mockGitHub)
-	err := client.MigratePR("123", Options{BranchName: "custom-branch"})
+	err := client.MigratePR(ctx, "123", Options{BranchName: "custom-branch"})
 
 	if err == nil {
 		t.Error("MigratePR() should return error when custom branch exists")
@@ -555,13 +577,14 @@ func TestMigratePR_CustomBranchName(t *testing.T) {
 }
 
 func TestMigratePRs_Success(t *testing.T) {
+	ctx := context.Background()
 	events := []Event{}
 	handler := func(event Event) {
 		events = append(events, event)
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(name string) bool {
+		hasBranchFunc: func(ctx context.Context, name string) bool {
 			return false
 		},
 	}
@@ -581,13 +604,12 @@ func TestMigratePRs_Success(t *testing.T) {
 	client := newTestClient(mockGit, mockGitHub)
 	client.SetEventHandler(handler)
 
-	err := client.MigratePRs([]string{"123", "124"}, Options{})
+	err := client.MigratePRs(ctx, []string{"123", "124"}, Options{})
 
 	if err != nil {
 		t.Errorf("MigratePRs() error = %v", err)
 	}
 
-	// Check for success message
 	hasSuccessMessage := false
 	for _, event := range events {
 		if event.Type == "success" && strings.Contains(event.Message, "Successfully migrated all 2 PRs") {
@@ -602,13 +624,14 @@ func TestMigratePRs_Success(t *testing.T) {
 }
 
 func TestMigratePRs_PartialFailure(t *testing.T) {
+	ctx := context.Background()
 	events := []Event{}
 	handler := func(event Event) {
 		events = append(events, event)
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(name string) bool {
+		hasBranchFunc: func(ctx context.Context, name string) bool {
 			return false
 		},
 	}
@@ -624,14 +647,14 @@ func TestMigratePRs_PartialFailure(t *testing.T) {
 					IsFork: true,
 				}, nil
 			}
-			return nil, errors.New("PR not found") // PR 124 fails
+			return nil, errors.New("PR not found")
 		},
 	}
 
 	client := newTestClient(mockGit, mockGitHub)
 	client.SetEventHandler(handler)
 
-	err := client.MigratePRs([]string{"123", "124"}, Options{})
+	err := client.MigratePRs(ctx, []string{"123", "124"}, Options{})
 
 	if err == nil {
 		t.Error("MigratePRs() should return error when some PRs fail")
@@ -641,7 +664,6 @@ func TestMigratePRs_PartialFailure(t *testing.T) {
 		t.Errorf("MigratePRs() error = %v, want error containing 'failed to migrate some PRs'", err)
 	}
 
-	// Check for partial success message
 	hasPartialSuccess := false
 	for _, event := range events {
 		if event.Type == "info" && strings.Contains(event.Message, "Migrated 1/2 PRs successfully") {
@@ -659,12 +681,6 @@ func TestNew(t *testing.T) {
 	migrator := New()
 	if migrator == nil {
 		t.Error("New() returned nil")
-	}
-
-	// Test that it implements the Migrator interface
-	_, ok := migrator.(Migrator)
-	if !ok {
-		t.Error("New() does not implement Migrator interface")
 	}
 }
 
@@ -684,7 +700,6 @@ func TestSetEventHandler(t *testing.T) {
 	}
 }
 
-// Benchmark tests
 func BenchmarkGenerateBranchName(b *testing.B) {
 	pr := &PRInfo{
 		Number: 123,

@@ -1,5 +1,9 @@
 # git-mfpr
 
+[![CI](https://github.com/user/git-mfpr/actions/workflows/ci.yml/badge.svg)](https://github.com/user/git-mfpr/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/user/git-mfpr/branch/main/graph/badge.svg)](https://codecov.io/gh/user/git-mfpr)
+[![Release](https://img.shields.io/github/release/user/git-mfpr.svg)](https://github.com/user/git-mfpr/releases/latest)
+
 A CLI tool that migrates GitHub pull requests from forks to branches in the main repository, preserving commit history and authorship.
 
 ## Overview
@@ -10,6 +14,74 @@ A CLI tool that migrates GitHub pull requests from forks to branches in the main
 - Run CI/CD pipelines that don't work well with forks
 - Collaborate more easily on a contribution
 - Maintain a cleaner repository structure
+
+## Value Proposition
+
+### Why Use git-mfpr Instead of Manual Commands?
+
+While you could manually run `gh pr checkout` and `git push`, `git-mfpr` provides significant value through:
+
+#### **Safety & Validation**
+- **Validates PR is from a fork** (prevents mistakes on same-repo PRs)
+- **Checks if branch already exists** (no accidental overwrites)
+- **Verifies PR is still open** (no dead PR migrations)
+- **Smart branch naming** (consistent, safe names with length limits)
+
+#### **Workflow Automation**
+- **One command instead of 3-4 manual steps**
+- **Batch processing** (multiple PRs at once)
+- **Dry-run mode** (preview actions before executing)
+- **Consistent commit messages and PR descriptions**
+
+#### **Team Benefits**
+- **Standardized process** across your entire team
+- **Reduced onboarding time** (new contributors learn one command)
+- **Prevents human error** (forgot to push, wrong branch name, etc.)
+- **Documentation** (the process is codified in the tool)
+
+#### **Automation & CI/CD**
+- **GitHub Action integration** for automated workflows
+- **Scheduled cleanup** of abandoned PRs
+- **Non-interactive operation** (works in automated environments)
+- **CI/CD pipeline integration** (migrate PRs as part of your workflow)
+
+### Real-World Scenarios
+
+#### **Scenario 1: Abandoned PRs**
+```bash
+# Instead of manually checking each PR status and running commands
+git-mfpr 123 124 125  # Batch migrate multiple abandoned PRs
+```
+
+#### **Scenario 2: Team Onboarding**
+```bash
+# New team member doesn't need to learn the manual process
+git-mfpr 123 --dry-run  # Shows them exactly what will happen
+```
+
+#### **Scenario 3: Automated Cleanup**
+```yaml
+# GitHub Action to automatically migrate PRs that pass CI but are abandoned
+- uses: yourusername/git-mfpr@v1
+  with:
+    pr-ref: ${{ needs.ci.outputs.pr-number }}
+```
+
+### When It's Worth It
+
+**Perfect for:**
+- Managing multiple repos with frequent fork PRs
+- Team environments where consistency matters
+- Automation needs (CI/CD, scheduled cleanup)
+- High-volume PR management
+- Reducing cognitive load and preventing mistakes
+
+**May not be worth it for:**
+- Occasional use (once a month)
+- Single-person projects
+- Simple workflows with just a few commands
+
+**Bottom line:** It's a quality-of-life tool that shines in team environments and automation scenarios, not just time-saving for individual use.
 
 ## Features
 
@@ -46,7 +118,7 @@ Download the latest release for your platform from the [releases page](https://g
 git-mfpr 123
 
 # Migrate multiple PRs
-git-mfpr 123 124 125
+git-mfpr 124 125
 
 # Migrate from a specific repository
 git-mfpr owner/repo#123
@@ -63,6 +135,72 @@ git-mfpr https://github.com/owner/repo/pull/123
 --no-create            # Don't offer to create a new PR
 --branch-name string   # Use custom branch name (single PR only)
 ```
+
+### As a CLI
+
+You can use `git-mfpr` directly in your terminal, or as a custom git command:
+
+```sh
+# Migrate PR #123 from the current repo (dry run)
+git-mfpr 123 --dry-run
+
+# Migrate a PR from a specific repo
+git-mfpr owner/repo#456
+
+# Use as a custom git command (if installed as git-mfpr)
+git mfpr 789
+
+# With custom branch name
+git-mfpr 123 --branch-name=my-feature-branch
+```
+
+---
+
+### As a GitHub Action
+
+Add this step to your workflow (e.g., `.github/workflows/migrate.yml`):
+
+```yaml
+name: Migrate Fork PRs
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr-ref:
+        description: 'PR reference (number, URL, or owner/repo#number)'
+        required: true
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Migrate PR from fork to branch
+        uses: yourusername/git-mfpr@v1
+        with:
+          pr-ref: ${{ github.event.inputs.pr-ref }}
+          dry-run: 'true'         # optional
+          no-push: 'false'        # optional
+          no-create: 'false'      # optional
+          branch-name: ''         # optional
+```
+
+**Replace `yourusername` with your actual GitHub username.**
+
+---
+
+#### Inputs
+
+| Name         | Description                                         | Required | Default  |
+|--------------|-----------------------------------------------------|----------|----------|
+| pr-ref       | PR reference (number, URL, or owner/repo#number)    | Yes      |          |
+| dry-run      | Show what would happen without executing            | No       | false    |
+| no-push      | Do not push branch                                  | No       | false    |
+| no-create    | Do not create PR                                    | No       | false    |
+| branch-name  | Custom branch name                                  | No       |          |
+
+---
 
 ### Examples
 

@@ -1,43 +1,62 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// PRInfo contains pull request information
 type PRInfo struct {
-	Number      int
-	Title       string
-	Author      string
-	HeadBranch  string
-	BaseBranch  string
-	State       string
-	URL         string
-	HeadRefOID  string
-	IsFork      bool
+	Number     int
+	Title      string
+	Author     string
+	HeadBranch string
+	BaseBranch string
+	State      string
+	URL        string
+	HeadRefOID string
+	IsFork     bool
 }
 
-// GitHub provides an interface for GitHub operations
 type GitHub interface {
-	GetPR(owner, repo string, number int) (*PRInfo, error)
-	CheckoutPR(number int, branch string) error
-	CreatePR(title, body, base string) error
-	IsGHInstalled() error
+	GetPR(ctx context.Context, owner, repo string, number int) (*PRInfo, error)
+	CheckoutPR(ctx context.Context, number int, branch string) error
+	CreatePR(ctx context.Context, title, body, base string) error
+	IsGHInstalled(ctx context.Context) error
 }
 
-// Client implements the GitHub interface
-type Client struct{}
+type Client struct {
+	timeout time.Duration
+}
 
-// New creates a new GitHub client
+type Option func(*Client)
+
+func WithTimeout(timeout time.Duration) Option {
+	return func(c *Client) {
+		c.timeout = timeout
+	}
+}
+
 func New() GitHub {
-	return &Client{}
+	return NewWithOptions()
 }
 
-// ghPRResponse represents the JSON response from gh pr view
+func NewWithOptions(opts ...Option) GitHub {
+	client := &Client{
+		timeout: 30 * time.Second,
+	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	return client
+}
+
 type ghPRResponse struct {
 	Number      int    `json:"number"`
 	Title       string `json:"title"`
@@ -52,78 +71,87 @@ type ghPRResponse struct {
 	} `json:"author"`
 }
 
-// IsGHInstalled checks if gh CLI is installed
-func (c *Client) IsGHInstalled() error {
-	cmd := exec.Command("gh", "--version")
+type Result struct {
+	Data  interface{}
+	Error error
+}
+
+type PRResult struct {
+	PR    *PRInfo
+	Error error
+}
+
+func (r *PRResult) IsSuccess() bool {
+	return r.Error == nil
+}
+
+func (r *PRResult) IsError() bool {
+	return r.Error != nil
+}
+
+func (c *Client) IsGHInstalled(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "gh", "--version")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("gh CLI is not installed. Install it from https://cli.github.com")
+		return &ErrGHNotInstalled{}
 	}
 	return nil
 }
 
-// GetPR fetches pull request information
-func (c *Client) GetPR(owner, repo string, number int) (*PRInfo, error) {
-	// Check if gh is installed
-	if err := c.IsGHInstalled(); err != nil {
+func (c *Client) GetPR(ctx context.Context, owner, repo string, number int) (*PRInfo, error) {
+	if err := c.IsGHInstalled(ctx); err != nil {
 		return nil, err
 	}
 
-	// Build the command
-	cmd := exec.Command("gh", "pr", "view", strconv.Itoa(number),
+	cmd := exec.CommandContext(ctx, "gh", "pr", "view", strconv.Itoa(number),
 		"--repo", fmt.Sprintf("%s/%s", owner, repo),
 		"--json", "number,title,author,headRefName,baseRefName,state,headRefOid,isFork,url")
-	
+
 	output, err := cmd.Output()
 	if err != nil {
-		// Check if it's an exit error to provide better error message
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			stderr := string(exitErr.Stderr)
 			if strings.Contains(stderr, "no pull requests found") {
-				return nil, fmt.Errorf("PR #%d not found in %s/%s", number, owner, repo)
+				return nil, &ErrPRNotFound{Number: number, Owner: owner, Repo: repo}
 			}
-			return nil, fmt.Errorf("failed to fetch PR: %s", stderr)
+			return nil, &ErrPRFetchFailed{Number: number, Owner: owner, Repo: repo, Detail: stderr}
 		}
-		return nil, fmt.Errorf("failed to fetch PR: %w", err)
+		return nil, &ErrPRFetchFailed{Number: number, Owner: owner, Repo: repo, Detail: err.Error()}
 	}
 
-	// Parse the JSON response
 	var pr ghPRResponse
 	if err := json.Unmarshal(output, &pr); err != nil {
-		return nil, fmt.Errorf("failed to parse PR data: %w", err)
+		return nil, &ErrPRParseFailed{Detail: err.Error()}
 	}
 
-	// Convert to our PRInfo structure
 	return &PRInfo{
-		Number:      pr.Number,
-		Title:       pr.Title,
-		Author:      pr.Author.Login,
-		HeadBranch:  pr.HeadRefName,
-		BaseBranch:  pr.BaseRefName,
-		State:       pr.State,
-		URL:         pr.URL,
-		HeadRefOID:  pr.HeadRefOID,
-		IsFork:      pr.IsFork,
+		Number:     pr.Number,
+		Title:      pr.Title,
+		Author:     pr.Author.Login,
+		HeadBranch: pr.HeadRefName,
+		BaseBranch: pr.BaseRefName,
+		State:      pr.State,
+		URL:        pr.URL,
+		HeadRefOID: pr.HeadRefOID,
+		IsFork:     pr.IsFork,
 	}, nil
 }
 
-// CheckoutPR checks out a pull request to a local branch
-func (c *Client) CheckoutPR(number int, branch string) error {
-	cmd := exec.Command("gh", "pr", "checkout", strconv.Itoa(number), "-b", branch)
+func (c *Client) CheckoutPR(ctx context.Context, number int, branch string) error {
+	cmd := exec.CommandContext(ctx, "gh", "pr", "checkout", strconv.Itoa(number), "-b", branch)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to checkout PR #%d: %w", number, err)
+		return &ErrPRCheckoutFailed{Number: number, Detail: err.Error()}
 	}
 	return nil
 }
 
-// CreatePR creates a new pull request
-func (c *Client) CreatePR(title, body, base string) error {
-	cmd := exec.Command("gh", "pr", "create",
+func (c *Client) CreatePR(ctx context.Context, title, body, base string) error {
+	cmd := exec.CommandContext(ctx, "gh", "pr", "create",
 		"--title", title,
 		"--body", body,
 		"--base", base)
-	
+
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create PR: %w", err)
+		return &ErrPRCreateFailed{Detail: err.Error()}
 	}
 	return nil
 }
