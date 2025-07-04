@@ -81,7 +81,9 @@ func TestGetPR_ErrorHandling(t *testing.T) {
 	originalPath := os.Getenv("PATH")
 	defer os.Setenv("PATH", originalPath)
 
-	os.Setenv("PATH", "")
+	if err := os.Setenv("PATH", ""); err != nil {
+		t.Fatalf("Failed to set PATH: %v", err)
+	}
 
 	client := New()
 	_, err := client.GetPR(ctx, "owner", "repo", 123)
@@ -244,7 +246,9 @@ func BenchmarkPRInfoParsing(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var pr ghPRResponse
-		json.Unmarshal([]byte(jsonData), &pr)
+		if err := json.Unmarshal([]byte(jsonData), &pr); err != nil {
+			b.Fatalf("Failed to unmarshal JSON: %v", err)
+		}
 	}
 }
 

@@ -57,11 +57,15 @@ func TestConsoleUI_StartPR(t *testing.T) {
 
 	ui.StartPR("owner/repo#123")
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatalf("Failed to close pipe: %v", err)
+	}
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	expected := "\n🔄 Migrating PR owner/repo#123...\n"
@@ -81,11 +85,15 @@ func TestConsoleUI_Error(t *testing.T) {
 	testErr := errors.New("test error")
 	ui.Error(testErr)
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatalf("Failed to close pipe: %v", err)
+	}
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	expected := "❌ Error: test error\n"
@@ -104,11 +112,15 @@ func TestConsoleUI_Success(t *testing.T) {
 
 	ui.Success("Operation completed")
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatalf("Failed to close pipe: %v", err)
+	}
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	expected := "✅ Operation completed\n"
@@ -127,11 +139,15 @@ func TestConsoleUI_Info(t *testing.T) {
 
 	ui.Info("Processing...")
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatalf("Failed to close pipe: %v", err)
+	}
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	expected := "ℹ️  Processing...\n"
@@ -172,11 +188,15 @@ func TestConsoleUI_Command(t *testing.T) {
 
 			ui.Command(tt.cmd)
 
-			w.Close()
+			if err := w.Close(); err != nil {
+				t.Fatalf("Failed to close pipe: %v", err)
+			}
 			os.Stdout = oldStdout
 
 			var buf bytes.Buffer
-			buf.ReadFrom(r)
+			if _, err := buf.ReadFrom(r); err != nil {
+				t.Fatalf("Failed to read from pipe: %v", err)
+			}
 			output := buf.String()
 
 			if output != tt.expected {
@@ -255,14 +275,22 @@ func TestConsoleUI_HandleEvent(t *testing.T) {
 
 			ui.HandleEvent(tt.event)
 
-			wOut.Close()
-			wErr.Close()
+			if err := wOut.Close(); err != nil {
+				t.Fatalf("Failed to close stdout pipe: %v", err)
+			}
+			if err := wErr.Close(); err != nil {
+				t.Fatalf("Failed to close stderr pipe: %v", err)
+			}
 			os.Stdout = oldStdout
 			os.Stderr = oldStderr
 
 			var bufOut, bufErr bytes.Buffer
-			bufOut.ReadFrom(rOut)
-			bufErr.ReadFrom(rErr)
+			if _, err := bufOut.ReadFrom(rOut); err != nil {
+				t.Fatalf("Failed to read from stdout pipe: %v", err)
+			}
+			if _, err := bufErr.ReadFrom(rErr); err != nil {
+				t.Fatalf("Failed to read from stderr pipe: %v", err)
+			}
 
 			if tt.expectStdout {
 				output := bufOut.String()

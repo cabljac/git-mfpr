@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+// runGitCommand is a helper function for tests to run git commands and handle errors
+func runGitCommand(t *testing.T, args ...string) {
+	t.Helper()
+	if err := exec.Command("git", args...).Run(); err != nil {
+		t.Fatalf("Failed to run git %v: %v", args, err)
+	}
+}
+
 func TestClient_CurrentRepo(t *testing.T) {
 	ctx := context.Background()
 	tests := []struct {
@@ -68,10 +76,12 @@ func TestClient_CurrentRepo(t *testing.T) {
 			tmpDir := t.TempDir()
 			oldWd, _ := os.Getwd()
 			defer os.Chdir(oldWd)
-			os.Chdir(tmpDir)
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatalf("Failed to change directory: %v", err)
+			}
 
-			exec.Command("git", "init").Run()                                  // #nosec G204
-			exec.Command("git", "remote", "add", "origin", tt.remoteURL).Run() // #nosec G204
+			runGitCommand(t, "init")
+			runGitCommand(t, "remote", "add", "origin", tt.remoteURL)
 
 			client := New()
 			owner, repo, err := client.CurrentRepo(ctx)
@@ -103,17 +113,21 @@ func TestClient_HasBranch(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
-	exec.Command("git", "init").Run()                                     // #nosec G204
-	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
-	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+	runGitCommand(t, "init")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
-	os.WriteFile("test.txt", []byte("test"), 0o600)
-	exec.Command("git", "add", ".").Run()                // #nosec G204
-	exec.Command("git", "commit", "-m", "initial").Run() // #nosec G204
+	if err := os.WriteFile("test.txt", []byte("test"), 0o600); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+	runGitCommand(t, "add", ".")
+	runGitCommand(t, "commit", "-m", "initial")
 
-	exec.Command("git", "branch", "test-branch").Run() // #nosec G204
+	runGitCommand(t, "branch", "test-branch")
 
 	client := New()
 
@@ -134,13 +148,13 @@ func TestClient_CurrentBranch(t *testing.T) {
 	os.Chdir(tmpDir)
 
 	// Initialize git repo
-	exec.Command("git", "init", "-b", "main").Run()
-	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
-	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+	runGitCommand(t, "init", "-b", "main")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	os.WriteFile("test.txt", []byte("test"), 0o600)
-	exec.Command("git", "add", ".").Run()                // #nosec G204
-	exec.Command("git", "commit", "-m", "initial").Run() // #nosec G204
+	runGitCommand(t, "add", ".")
+	runGitCommand(t, "commit", "-m", "initial")
 
 	client := New()
 
@@ -152,7 +166,7 @@ func TestClient_CurrentBranch(t *testing.T) {
 		t.Errorf("CurrentBranch() = %v, want main", branch)
 	}
 
-	exec.Command("git", "checkout", "-b", "feature").Run() // #nosec G204
+	runGitCommand(t, "checkout", "-b", "feature")
 
 	branch, err = client.CurrentBranch(ctx)
 	if err != nil {
@@ -176,7 +190,7 @@ func TestClient_IsInRepo(t *testing.T) {
 		t.Error("IsInRepo() returned true outside git repo")
 	}
 
-	exec.Command("git", "init").Run()
+	runGitCommand(t, "init")
 
 	if !client.IsInRepo(ctx) {
 		t.Error("IsInRepo() returned false inside git repo")
@@ -191,15 +205,15 @@ func TestClient_Checkout(t *testing.T) {
 	os.Chdir(tmpDir)
 
 	// Initialize git repo
-	exec.Command("git", "init", "-b", "main").Run()
-	exec.Command("git", "config", "user.email", "test@example.com").Run()
-	exec.Command("git", "config", "user.name", "Test User").Run()
+	runGitCommand(t, "init", "-b", "main")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	os.WriteFile("test.txt", []byte("test"), 0o600)
-	exec.Command("git", "add", ".").Run()                // #nosec G204
-	exec.Command("git", "commit", "-m", "initial").Run() // #nosec G204
+	runGitCommand(t, "add", ".")
+	runGitCommand(t, "commit", "-m", "initial")
 
-	exec.Command("git", "branch", "test-branch").Run()
+	runGitCommand(t, "branch", "test-branch")
 
 	client := New()
 
@@ -230,16 +244,16 @@ func TestClient_DeleteBranch(t *testing.T) {
 	os.Chdir(tmpDir)
 
 	// Initialize git repo
-	exec.Command("git", "init", "-b", "main").Run()
-	exec.Command("git", "config", "user.email", "test@example.com").Run()
-	exec.Command("git", "config", "user.name", "Test User").Run()
+	runGitCommand(t, "init", "-b", "main")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	os.WriteFile("test.txt", []byte("test"), 0o600)
-	exec.Command("git", "add", ".").Run()                // #nosec G204
-	exec.Command("git", "commit", "-m", "initial").Run() // #nosec G204
+	runGitCommand(t, "add", ".")
+	runGitCommand(t, "commit", "-m", "initial")
 
-	exec.Command("git", "checkout", "-b", "test-branch").Run() // #nosec G204
-	exec.Command("git", "checkout", "main").Run()              // #nosec G204
+	runGitCommand(t, "checkout", "-b", "test-branch")
+	runGitCommand(t, "checkout", "main")
 
 	client := New()
 
@@ -557,7 +571,7 @@ func TestClient_CurrentRepo_NoRemote(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Chdir(tmpDir)
 
-	exec.Command("git", "init").Run() // #nosec G204
+	runGitCommand(t, "init")
 
 	client := New()
 	_, _, err := client.CurrentRepo(ctx)
@@ -590,9 +604,9 @@ func TestClient_Pull_Error(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Chdir(tmpDir)
 
-	exec.Command("git", "init").Run()                                     // #nosec G204
-	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
-	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+	runGitCommand(t, "init")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	client := New()
 	err := client.Pull(ctx, "nonexistent", "main")
@@ -625,9 +639,9 @@ func TestClient_Push_Error(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Chdir(tmpDir)
 
-	exec.Command("git", "init").Run()                                     // #nosec G204
-	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
-	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+	runGitCommand(t, "init")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	client := New()
 	err := client.Push(ctx, "nonexistent", "main")
@@ -660,9 +674,9 @@ func TestClient_Checkout_Error(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Chdir(tmpDir)
 
-	exec.Command("git", "init").Run()                                     // #nosec G204
-	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
-	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+	runGitCommand(t, "init")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	client := New()
 	err := client.Checkout(ctx, "nonexistent-branch")
@@ -695,9 +709,9 @@ func TestClient_DeleteBranch_Error(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Chdir(tmpDir)
 
-	exec.Command("git", "init").Run()                                     // #nosec G204
-	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
-	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+	runGitCommand(t, "init")
+	runGitCommand(t, "config", "user.email", "test@example.com")
+	runGitCommand(t, "config", "user.name", "Test User")
 
 	client := New()
 	err := client.DeleteBranch(ctx, "nonexistent-branch")

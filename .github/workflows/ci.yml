@@ -96,11 +96,8 @@ jobs:
           echo "Building for ${{ matrix.os }}/${{ matrix.arch }}"
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o bin/git-mfpr-${{ matrix.os }}-${{ matrix.arch }} ./cmd/git-mfpr/
 
-      - name: Build test binary
-        run: |
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o bin/test-${{ matrix.os }}-${{ matrix.arch }} ./cmd/test/
-
       - name: Upload build artifacts
+        if: env.UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.os }}-${{ matrix.arch }}
@@ -127,20 +124,14 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Run GoReleaser snapshot
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --snapshot --clean --skip-publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload snapshot artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: snapshot
-          path: dist/
+      # - name: Run GoReleaser snapshot
+      #   uses: goreleaser/goreleaser-action@v6
+      #   with:
+      #     distribution: goreleaser
+      #     version: latest
+      #     args: release --snapshot --clean --skip-publish
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Full Release on tag push (DISABLED - uncomment when ready to release)
   # release:
