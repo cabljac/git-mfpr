@@ -58,5 +58,6 @@ dist/
 # Coverage reports
 coverage.out
 coverage.html
+coverage.txt
 
 CLAUDE.md
