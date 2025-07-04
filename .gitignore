@@ -4,7 +4,8 @@
 *.dll
 *.so
 *.dylib
-git-mfpr
+/bin/git-mfpr
+git-mfpr.exe
 
 # Test binary, built with `go test -c`
 *.test
