@@ -1,8 +1,8 @@
 # git-mfpr
 
-[![CI](https://github.com/user/git-mfpr/actions/workflows/ci.yml/badge.svg)](https://github.com/user/git-mfpr/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/user/git-mfpr/branch/main/graph/badge.svg)](https://codecov.io/gh/user/git-mfpr)
-[![Release](https://img.shields.io/github/release/user/git-mfpr.svg)](https://github.com/user/git-mfpr/releases/latest)
+[![CI](https://github.com/cabljac/git-mfpr/actions/workflows/ci.yml/badge.svg)](https://github.com/cabljac/git-mfpr/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/github/cabljac/git-mfpr/branch/main/graph/badge.svg?token=OAI9FZQ1BF)](https://codecov.io/github/cabljac/git-mfpr)
+[![Release](https://img.shields.io/github/release/cabljac/git-mfpr.svg)](https://github.com/cabljac/git-mfpr/releases/latest)
 
 A CLI tool that migrates GitHub pull requests from forks to branches in the main repository, preserving commit history and authorship.
 
@@ -102,12 +102,12 @@ git-mfpr 123 --dry-run  # Shows them exactly what will happen
 ### Install from Source
 
 ```bash
-go install github.com/user/git-mfpr/cmd/git-mfpr@latest
+go install github.com/cabljac/git-mfpr/cmd/git-mfpr@latest
 ```
 
 ### Download Binary
 
-Download the latest release for your platform from the [releases page](https://github.com/user/git-mfpr/releases).
+Download the latest release for your platform from the [releases page](https://github.com/cabljac/git-mfpr/releases).
 
 ## Usage
 
@@ -264,7 +264,7 @@ The title is converted to lowercase, with special characters replaced by hyphens
 
 ```bash
 # Clone the repository
-git clone https://github.com/user/git-mfpr.git
+git clone https://github.com/cabljac/git-mfpr.git
 cd git-mfpr
 
 # Build
