@@ -37,8 +37,9 @@ jobs:
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
@@ -61,7 +62,6 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
-          args: --out-format=colored-line-number
 
       - name: Run golangci-lint
         run: golangci-lint run
@@ -83,35 +83,14 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Debug - List files
-        run: |
-          echo "=== DEBUG START ==="
-          echo "Current directory: $(pwd)"
-          echo "Repository contents:"
-          ls -la
-          echo ""
-          echo "cmd directory contents:"
-          ls -la cmd/ || echo "cmd directory not found"
-          echo ""
-          echo "cmd/git-mfpr contents:"
-          ls -la cmd/git-mfpr/ || echo "cmd/git-mfpr directory not found"
-          echo ""
-          echo "cmd/test contents:"
-          ls -la cmd/test/ || echo "cmd/test directory not found"
-          echo ""
-          echo "Full directory tree:"
-          find . -type d -name "cmd" -exec ls -la {} \;
-          echo "=== DEBUG END ==="
-
       - name: Build git-mfpr
         run: |
           echo "Building for ${{ matrix.os }}/${{ matrix.arch }}"
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o bin/git-mfpr-${{ matrix.os }}-${{ matrix.arch }} ./cmd/git-mfpr/
 
-      # Temporarily disabled to isolate the issue
-      # - name: Build test binary
-      #   run: |
-      #     GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o bin/test-${{ matrix.os }}-${{ matrix.arch }} ./cmd/test/
+      - name: Build test binary
+        run: |
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o bin/test-${{ matrix.os }}-${{ matrix.arch }} ./cmd/test/
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
