@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	"github.com/user/git-mfpr/internal/migrate"
 	"github.com/user/git-mfpr/internal/ui"
 )
