@@ -1,0 +1,33 @@
+name: 'git-mfpr'
+description: 'Migrate GitHub fork PRs to branches'
+inputs:
+  pr-ref:
+    description: 'PR reference (number, URL, or owner/repo#number)'
+    required: true
+  dry-run:
+    description: 'Show what would happen without executing'
+    required: false
+    default: 'false'
+  no-push:
+    description: 'Do not push branch'
+    required: false
+    default: 'false'
+  no-create:
+    description: 'Do not create PR'
+    required: false
+    default: 'false'
+  branch-name:
+    description: 'Custom branch name'
+    required: false
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.pr-ref }}
+    - ${{ inputs.dry-run == 'true' && '--dry-run' || '' }}
+    - ${{ inputs.no-push == 'true' && '--no-push' || '' }}
+    - ${{ inputs.no-create == 'true' && '--no-create' || '' }}
+    - ${{ inputs.branch-name && format('--branch-name={0}', inputs.branch-name) || '' }}
+branding:
+  icon: 'git-pull-request'
+  color: 'blue' 

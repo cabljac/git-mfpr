@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -14,21 +15,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create a migrator
 	m := migrate.New()
 
-	// Set up event handler to display progress
 	m.SetEventHandler(func(event migrate.Event) {
 		switch event.Type {
-		case "info":
+		case migrate.EventInfo:
 			if event.Message != "" {
 				fmt.Printf("→ %s\n", event.Message)
 			}
-		case "success":
+		case migrate.EventSuccess:
 			fmt.Printf("✅ %s\n", event.Message)
-		case "error":
+		case migrate.EventError:
 			fmt.Printf("❌ %s\n", event.Message)
-		case "command":
+		case migrate.EventCommand:
 			if event.Message != "" {
 				fmt.Printf("  %s\n", event.Message)
 			}
@@ -38,11 +37,11 @@ func main() {
 		}
 	})
 
-	// Run migration in dry-run mode
-	err := m.MigratePR(os.Args[1], migrate.Options{
+	ctx := context.Background()
+	err := m.MigratePR(ctx, os.Args[1], migrate.Options{
 		DryRun: true,
 	})
-	
+
 	if err != nil {
 		log.Fatal(err)
 	}
