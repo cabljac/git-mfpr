@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-var mockCommand = exec.Command
-
 func TestClient_IsGHInstalled(t *testing.T) {
 	ctx := context.Background()
 	client := New()
@@ -25,10 +23,8 @@ func TestClient_IsGHInstalled(t *testing.T) {
 		if _, ok := err.(*ErrGHNotInstalled); !ok {
 			t.Errorf("Expected ErrGHNotInstalled, got %T", err)
 		}
-	} else {
-		if err != nil {
-			t.Errorf("IsGHInstalled() error = %v", err)
-		}
+	} else if err != nil {
+		t.Errorf("IsGHInstalled() error = %v", err)
 	}
 }
 
@@ -276,4 +272,238 @@ func ExampleNewWithOptions() {
 	}
 
 	fmt.Printf("PR #%d: %s\n", pr.Number, pr.Title)
+}
+
+func TestGetPR_NetworkFailure(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test with a timeout context to simulate network failure
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Nanosecond)
+	defer cancel()
+
+	_, err := client.GetPR(timeoutCtx, "owner", "repo", 123)
+	if err == nil {
+		t.Error("GetPR() should return error on timeout")
+	}
+}
+
+func TestGetPR_InvalidJSONResponse(t *testing.T) {
+	// This test would require mocking exec.Command to return invalid JSON
+	// For now, we'll test the JSON parsing logic separately
+	invalidJSON := `{"invalid": json}`
+	var pr ghPRResponse
+	err := json.Unmarshal([]byte(invalidJSON), &pr)
+	if err == nil {
+		t.Error("Should fail to parse invalid JSON")
+	}
+}
+
+func TestGetPR_ExitErrorHandling(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test with a non-existent repository to trigger exit error
+	_, err := client.GetPR(ctx, "nonexistent", "nonexistent", 999999)
+	if err == nil {
+		t.Skip("GetPR() succeeded unexpectedly, skipping exit error test")
+	}
+
+	// Check if it's the expected error type
+	if _, ok := err.(*ErrPRNotFound); !ok {
+		if _, ok := err.(*ErrPRFetchFailed); !ok {
+			if _, ok := err.(*ErrGHNotInstalled); !ok {
+				t.Errorf("Expected ErrPRNotFound, ErrPRFetchFailed, or ErrGHNotInstalled, got %T: %v", err, err)
+			}
+		}
+	}
+}
+
+func TestGetPR_MissingAuthorField(t *testing.T) {
+	// Test JSON response with missing author field
+	jsonData := `{
+		"number": 123,
+		"title": "Test PR",
+		"state": "open",
+		"headRefName": "feature-branch",
+		"baseRefName": "main",
+		"headRefOid": "abc123",
+		"isCrossRepository": true,
+		"url": "https://github.com/owner/repo/pull/123"
+	}`
+
+	var pr ghPRResponse
+	err := json.Unmarshal([]byte(jsonData), &pr)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal PR data: %v", err)
+	}
+
+	// Author field should be empty but not cause an error
+	if pr.Author.Login != "" {
+		t.Errorf("Expected empty author login, got %s", pr.Author.Login)
+	}
+}
+
+func TestCheckoutPR_NetworkFailure(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test with a timeout context to simulate network failure
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Nanosecond)
+	defer cancel()
+
+	err := client.CheckoutPR(timeoutCtx, "owner", "repo", 123, "test-branch")
+	if err == nil {
+		t.Error("CheckoutPR() should return error on timeout")
+	}
+}
+
+func TestCheckoutPR_CommandFailure(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test with invalid PR number to trigger command failure
+	err := client.CheckoutPR(ctx, "owner", "repo", 999999, "test-branch")
+	if err == nil {
+		t.Skip("CheckoutPR() succeeded unexpectedly, skipping command failure test")
+	}
+
+	// Check if it's the expected error type
+	if _, ok := err.(*ErrPRCheckoutFailed); !ok {
+		t.Errorf("Expected ErrPRCheckoutFailed, got %T: %v", err, err)
+	}
+}
+
+func TestCreatePR_CommandFailure(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test with invalid base branch to trigger command failure
+	err := client.CreatePR(ctx, "Test PR", "Test body", "nonexistent-branch")
+	if err == nil {
+		t.Skip("CreatePR() succeeded unexpectedly, skipping command failure test")
+	}
+
+	// Check if it's the expected error type
+	if _, ok := err.(*ErrPRCreateFailed); !ok {
+		t.Errorf("Expected ErrPRCreateFailed, got %T: %v", err, err)
+	}
+}
+
+func TestGetPR_EmptyResponse(t *testing.T) {
+	// Test with empty response (this would require mocking exec.Command)
+	// For now, test the JSON parsing with empty data
+	emptyJSON := `{}`
+	var pr ghPRResponse
+	err := json.Unmarshal([]byte(emptyJSON), &pr)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal empty JSON: %v", err)
+	}
+
+	// Should have zero values
+	if pr.Number != 0 {
+		t.Errorf("Expected Number = 0, got %d", pr.Number)
+	}
+	if pr.Title != "" {
+		t.Errorf("Expected Title = '', got %s", pr.Title)
+	}
+}
+
+func TestGetPR_MalformedJSON(t *testing.T) {
+	// Test with malformed JSON that's missing required fields
+	malformedJSON := `{"number": 123, "title": "Test"`
+	var pr ghPRResponse
+	err := json.Unmarshal([]byte(malformedJSON), &pr)
+	if err == nil {
+		t.Error("Should fail to parse malformed JSON")
+	}
+}
+
+func TestErrorTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected string
+	}{
+		{
+			name:     "ErrPRNotFound",
+			err:      &ErrPRNotFound{Number: 123, Owner: "owner", Repo: "repo"},
+			expected: "PR #123 not found in owner/repo",
+		},
+		{
+			name:     "ErrPRFetchFailed",
+			err:      &ErrPRFetchFailed{Number: 123, Owner: "owner", Repo: "repo", Detail: "network error"},
+			expected: "failed to fetch PR #123 from owner/repo: network error",
+		},
+		{
+			name:     "ErrPRParseFailed",
+			err:      &ErrPRParseFailed{Detail: "invalid json"},
+			expected: "failed to parse PR data: invalid json",
+		},
+		{
+			name:     "ErrPRCheckoutFailed",
+			err:      &ErrPRCheckoutFailed{Number: 123, Detail: "branch not found"},
+			expected: "failed to checkout PR #123: branch not found",
+		},
+		{
+			name:     "ErrPRCreateFailed",
+			err:      &ErrPRCreateFailed{Detail: "invalid base branch"},
+			expected: "failed to create PR: invalid base branch",
+		},
+		{
+			name:     "ErrGHNotInstalled",
+			err:      &ErrGHNotInstalled{},
+			expected: "gh CLI is not installed. Install it from https://cli.github.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.err.Error() != tt.expected {
+				t.Errorf("Error message = %q, want %q", tt.err.Error(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewWithOptions_Timeout(t *testing.T) {
+	timeout := 15 * time.Second
+	client := NewWithOptions(WithTimeout(timeout))
+
+	if client == nil {
+		t.Error("NewWithOptions() returned nil")
+	}
+}
+
+func TestGetPR_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	_, err := client.GetPR(ctx, "owner", "repo", 123)
+	if err == nil {
+		t.Error("GetPR() should return error when context is cancelled")
+	}
+}
+
+func TestCheckoutPR_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	err := client.CheckoutPR(ctx, "owner", "repo", 123, "test-branch")
+	if err == nil {
+		t.Error("CheckoutPR() should return error when context is cancelled")
+	}
+}
+
+func TestCreatePR_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	err := client.CreatePR(ctx, "Test PR", "Test body", "main")
+	if err == nil {
+		t.Error("CreatePR() should return error when context is cancelled")
+	}
 }

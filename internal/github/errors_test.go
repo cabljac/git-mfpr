@@ -175,7 +175,7 @@ func TestErrPRCreateFailed_Error(t *testing.T) {
 }
 
 // Test that errors implement the error interface
-func TestErrorsImplementErrorInterface(t *testing.T) {
+func TestErrorsImplementErrorInterface(_ *testing.T) {
 	var _ error = ErrGHNotInstalled{}
 	var _ error = ErrPRNotFound{}
 	var _ error = ErrPRFetchFailed{}

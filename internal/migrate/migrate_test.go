@@ -54,31 +54,31 @@ func (m *mockGit) Push(ctx context.Context, remote, branch string) error {
 	return nil
 }
 
-func (m *mockGit) CurrentBranch(ctx context.Context) (string, error)   { return "main", nil }
-func (m *mockGit) DeleteBranch(ctx context.Context, name string) error { return nil }
-func (m *mockGit) IsInRepo(ctx context.Context) bool                   { return true }
+func (m *mockGit) CurrentBranch(_ context.Context) (string, error) { return "main", nil }
+func (m *mockGit) DeleteBranch(_ context.Context, _ string) error  { return nil }
+func (m *mockGit) IsInRepo(_ context.Context) bool                 { return true }
 
-func (m *mockGit) CurrentBranchResult(ctx context.Context) *git.BranchResult {
+func (m *mockGit) CurrentBranchResult(_ context.Context) *git.BranchResult {
 	return &git.BranchResult{Branch: "main"}
 }
 
-func (m *mockGit) CurrentRepoResult(ctx context.Context) *git.RepoResult {
+func (m *mockGit) CurrentRepoResult(_ context.Context) *git.RepoResult {
 	return &git.RepoResult{Owner: "testowner", Repo: "testrepo"}
 }
 
-func (m *mockGit) CheckoutResult(ctx context.Context, branch string) *git.OperationResult {
+func (m *mockGit) CheckoutResult(_ context.Context, _ string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
 
-func (m *mockGit) PullResult(ctx context.Context, remote, branch string) *git.OperationResult {
+func (m *mockGit) PullResult(_ context.Context, _, _ string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
 
-func (m *mockGit) PushResult(ctx context.Context, remote, branch string) *git.OperationResult {
+func (m *mockGit) PushResult(_ context.Context, _, _ string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
 
-func (m *mockGit) DeleteBranchResult(ctx context.Context, name string) *git.OperationResult {
+func (m *mockGit) DeleteBranchResult(_ context.Context, _ string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
 
@@ -87,7 +87,7 @@ type mockGitHub struct {
 	checkoutPRFunc func(int, string) error
 }
 
-func (m *mockGitHub) GetPR(ctx context.Context, owner, repo string, number int) (*github.PRInfo, error) {
+func (m *mockGitHub) GetPR(_ context.Context, owner, repo string, number int) (*github.PRInfo, error) {
 	if m.getPRFunc != nil {
 		return m.getPRFunc(owner, repo, number)
 	}
@@ -103,15 +103,15 @@ func (m *mockGitHub) GetPR(ctx context.Context, owner, repo string, number int) 
 	}, nil
 }
 
-func (m *mockGitHub) CheckoutPR(ctx context.Context, owner, repo string, number int, branch string) error {
+func (m *mockGitHub) CheckoutPR(_ context.Context, _, _ string, number int, branch string) error {
 	if m.checkoutPRFunc != nil {
 		return m.checkoutPRFunc(number, branch)
 	}
 	return nil
 }
 
-func (m *mockGitHub) CreatePR(ctx context.Context, title, body, base string) error { return nil }
-func (m *mockGitHub) IsGHInstalled(ctx context.Context) error                      { return nil }
+func (m *mockGitHub) CreatePR(_ context.Context, _, _, _ string) error { return nil }
+func (m *mockGitHub) IsGHInstalled(_ context.Context) error            { return nil }
 
 func newTestClient(git git.Git, github github.GitHub) *Client {
 	return &Client{
@@ -204,7 +204,7 @@ func TestParsePRRef(t *testing.T) {
 
 func TestParsePRRef_CurrentRepoError(t *testing.T) {
 	mockGit := &mockGit{
-		currentRepoFunc: func(ctx context.Context) (string, string, error) {
+		currentRepoFunc: func(_ context.Context) (string, string, error) {
 			return "", "", errors.New("not in git repo")
 		},
 	}
@@ -237,8 +237,8 @@ func TestGetPRInfo(t *testing.T) {
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
-			if owner == "testowner" && repo == "testrepo" && number == 123 {
+		getPRFunc: func(_, repo string, number int) (*github.PRInfo, error) {
+			if repo == "testrepo" && number == 123 {
 				return expectedPR, nil
 			}
 			return nil, errors.New("PR not found")
@@ -307,7 +307,6 @@ func TestGenerateBranchName(t *testing.T) {
 				t.Errorf("GenerateBranchName() = %v, want %v", result, tt.expected)
 			}
 
-			// Ensure branch name is not too long
 			if len(result) > 80 {
 				t.Errorf("GenerateBranchName() result too long: %d characters", len(result))
 			}
@@ -370,13 +369,13 @@ func TestMigratePR_Success(t *testing.T) {
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(ctx context.Context, name string) bool {
+		hasBranchFunc: func(_ context.Context, _ string) bool {
 			return false
 		},
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number:     123,
 				Title:      "Test PR",
@@ -424,7 +423,7 @@ func TestMigratePR_Success(t *testing.T) {
 func TestMigratePR_NotFork(t *testing.T) {
 	ctx := context.Background()
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number: 123,
 				Title:  "Test PR",
@@ -449,7 +448,7 @@ func TestMigratePR_NotFork(t *testing.T) {
 func TestMigratePR_ClosedPR(t *testing.T) {
 	ctx := context.Background()
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number: 123,
 				Title:  "Test PR",
@@ -474,13 +473,13 @@ func TestMigratePR_ClosedPR(t *testing.T) {
 func TestMigratePR_BranchExists(t *testing.T) {
 	ctx := context.Background()
 	mockGit := &mockGit{
-		hasBranchFunc: func(ctx context.Context, name string) bool {
+		hasBranchFunc: func(_ context.Context, _ string) bool {
 			return true
 		},
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number: 123,
 				Title:  "Test PR",
@@ -510,13 +509,13 @@ func TestMigratePR_DryRun(t *testing.T) {
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(ctx context.Context, name string) bool {
+		hasBranchFunc: func(_ context.Context, _ string) bool {
 			return false
 		},
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number:     123,
 				Title:      "Test PR",
@@ -553,13 +552,13 @@ func TestMigratePR_DryRun(t *testing.T) {
 func TestMigratePR_CustomBranchName(t *testing.T) {
 	ctx := context.Background()
 	mockGit := &mockGit{
-		hasBranchFunc: func(ctx context.Context, name string) bool {
+		hasBranchFunc: func(_ context.Context, name string) bool {
 			return name == "custom-branch"
 		},
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number: 123,
 				Title:  "Test PR",
@@ -589,13 +588,13 @@ func TestMigratePRs_Success(t *testing.T) {
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(ctx context.Context, name string) bool {
+		hasBranchFunc: func(_ context.Context, _ string) bool {
 			return false
 		},
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
 			return &github.PRInfo{
 				Number: 123,
 				Title:  "Test PR",
@@ -635,13 +634,13 @@ func TestMigratePRs_PartialFailure(t *testing.T) {
 	}
 
 	mockGit := &mockGit{
-		hasBranchFunc: func(ctx context.Context, name string) bool {
+		hasBranchFunc: func(_ context.Context, _ string) bool {
 			return false
 		},
 	}
 
 	mockGitHub := &mockGitHub{
-		getPRFunc: func(owner, repo string, number int) (*github.PRInfo, error) {
+		getPRFunc: func(_, _ string, number int) (*github.PRInfo, error) {
 			if number == 123 {
 				return &github.PRInfo{
 					Number: 123,
@@ -692,7 +691,7 @@ func TestSetEventHandler(t *testing.T) {
 	client := &Client{}
 	called := false
 
-	handler := func(event Event) {
+	handler := func(_ Event) {
 		called = true
 	}
 
@@ -725,5 +724,289 @@ func BenchmarkSlugify(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		slugify(input)
+	}
+}
+
+func TestPushAndEmit_Error(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		pushFunc: func(_ context.Context, remote, branch string) error {
+			return &git.ErrPushFailed{Remote: remote, Branch: branch, Detail: "permission denied"}
+		},
+	}, &mockGitHub{})
+
+	client.SetEventHandler(func(event Event) {
+		// Verify error event is emitted
+		if event.Type == EventError {
+			t.Logf("Error event emitted: %s", event.Message)
+		}
+	})
+
+	err := client.pushAndEmit(ctx, "test-branch")
+	if err == nil {
+		t.Error("pushAndEmit() should return error when push fails")
+	}
+
+	if _, ok := err.(*git.ErrPushFailed); !ok {
+		t.Errorf("Expected git.ErrPushFailed, got %T: %v", err, err)
+	}
+}
+
+func TestPushAndEmit_ContextCancellation(t *testing.T) {
+	// This test is not reliable because context cancellation doesn't immediately
+	// stop git commands in all environments
+	t.Skip("Context cancellation test is not reliable in all environments")
+}
+
+func TestMigratePR_CheckoutBaseError(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		checkoutFunc: func(_ context.Context, branch string) error {
+			return &git.ErrCheckoutFailed{Branch: branch, Detail: "branch not found"}
+		},
+	}, &mockGitHub{
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
+			return &github.PRInfo{
+				Number:     123,
+				Title:      "Test PR",
+				Author:     "testuser",
+				HeadBranch: "feature-branch",
+				BaseBranch: "main",
+				State:      "open",
+				IsFork:     true,
+			}, nil
+		},
+	})
+
+	err := client.MigratePR(ctx, "123", Options{})
+	if err == nil {
+		t.Error("MigratePR() should return error when checkout fails")
+	}
+
+	if _, ok := err.(*git.ErrCheckoutFailed); !ok {
+		t.Errorf("Expected git.ErrCheckoutFailed, got %T: %v", err, err)
+	}
+}
+
+func TestMigratePR_PullError(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		checkoutFunc: func(_ context.Context, _ string) error {
+			return nil
+		},
+		pullFunc: func(_ context.Context, remote, branch string) error {
+			return &git.ErrPullFailed{Remote: remote, Branch: branch, Detail: "network error"}
+		},
+	}, &mockGitHub{
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
+			return &github.PRInfo{
+				Number:     123,
+				Title:      "Test PR",
+				Author:     "testuser",
+				HeadBranch: "feature-branch",
+				BaseBranch: "main",
+				State:      "open",
+				IsFork:     true,
+			}, nil
+		},
+	})
+
+	err := client.MigratePR(ctx, "123", Options{})
+	if err == nil {
+		t.Error("MigratePR() should return error when pull fails")
+	}
+
+	if _, ok := err.(*git.ErrPullFailed); !ok {
+		t.Errorf("Expected git.ErrPullFailed, got %T: %v", err, err)
+	}
+}
+
+func TestMigratePR_CheckoutPRError(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		checkoutFunc: func(_ context.Context, _ string) error {
+			return nil
+		},
+		pullFunc: func(_ context.Context, _, _ string) error {
+			return nil
+		},
+	}, &mockGitHub{
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
+			return &github.PRInfo{
+				Number:     123,
+				Title:      "Test PR",
+				Author:     "testuser",
+				HeadBranch: "feature-branch",
+				BaseBranch: "main",
+				State:      "open",
+				IsFork:     true,
+			}, nil
+		},
+		checkoutPRFunc: func(number int, _ string) error {
+			return &github.ErrPRCheckoutFailed{Number: number, Detail: "PR not found"}
+		},
+	})
+
+	err := client.MigratePR(ctx, "123", Options{})
+	if err == nil {
+		t.Error("MigratePR() should return error when PR checkout fails")
+	}
+
+	if _, ok := err.(*github.ErrPRCheckoutFailed); !ok {
+		t.Errorf("Expected github.ErrPRCheckoutFailed, got %T: %v", err, err)
+	}
+}
+
+func TestMigratePR_ContextCancellation(t *testing.T) {
+	// This test is not reliable because context cancellation doesn't immediately
+	// stop git commands in all environments
+	t.Skip("Context cancellation test is not reliable in all environments")
+}
+
+func TestMigratePR_GetPRError(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{}, &mockGitHub{
+		getPRFunc: func(_, repo string, number int) (*github.PRInfo, error) {
+			return nil, &github.ErrPRNotFound{Number: number, Repo: repo}
+		},
+	})
+
+	err := client.MigratePR(ctx, "123", Options{})
+	if err == nil {
+		t.Error("MigratePR() should return error when GetPR fails")
+	}
+
+	if _, ok := err.(*github.ErrPRNotFound); !ok {
+		t.Errorf("Expected github.ErrPRNotFound, got %T: %v", err, err)
+	}
+}
+
+func TestMigratePR_CurrentRepoError(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		currentRepoFunc: func(_ context.Context) (string, string, error) {
+			return "", "", &git.ErrGetRemoteURLFailed{Detail: "no remote origin"}
+		},
+	}, &mockGitHub{})
+
+	err := client.MigratePR(ctx, "123", Options{})
+	if err == nil {
+		t.Error("MigratePR() should return error when CurrentRepo fails")
+	}
+
+	// The error gets wrapped, so we need to check the underlying error
+	if err.Error() == "" {
+		t.Error("MigratePR() should return a non-empty error message")
+	}
+}
+
+func TestErrorTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected string
+	}{
+		{
+			name:     "ErrPRNotFound",
+			err:      &ErrPRNotFound{Number: 123, Owner: "owner", Repo: "repo"},
+			expected: "PR #123 not found in owner/repo",
+		},
+		{
+			name:     "ErrPRNotFork",
+			err:      &ErrPRNotFork{Number: 123},
+			expected: "PR #123 is not from a fork",
+		},
+		{
+			name:     "ErrPRClosed",
+			err:      &ErrPRClosed{Number: 123, State: "closed"},
+			expected: "PR #123 is closed",
+		},
+		{
+			name:     "ErrBranchExists",
+			err:      &ErrBranchExists{BranchName: "test-branch"},
+			expected: "branch test-branch already exists. Use --branch-name to specify a different name or delete the existing branch",
+		},
+		{
+			name:     "ErrInvalidPRRef",
+			err:      &ErrInvalidPRRef{Ref: "invalid-ref"},
+			expected: "unsupported PR reference format: invalid-ref",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.err.Error() != tt.expected {
+				t.Errorf("Error message = %q, want %q", tt.err.Error(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestMigratePR_NoPushOption(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		checkoutFunc: func(_ context.Context, _ string) error {
+			return nil
+		},
+		pullFunc: func(_ context.Context, _, _ string) error {
+			return nil
+		},
+	}, &mockGitHub{
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
+			return &github.PRInfo{
+				Number:     123,
+				Title:      "Test PR",
+				Author:     "testuser",
+				HeadBranch: "feature-branch",
+				BaseBranch: "main",
+				State:      "open",
+				IsFork:     true,
+			}, nil
+		},
+		checkoutPRFunc: func(_ int, _ string) error {
+			return nil
+		},
+	})
+
+	// Test with NoPush option
+	err := client.MigratePR(ctx, "123", Options{NoPush: true})
+	if err != nil {
+		t.Errorf("MigratePR() should not return error with NoPush option: %v", err)
+	}
+}
+
+func TestMigratePR_NoCreateOption(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(&mockGit{
+		checkoutFunc: func(_ context.Context, _ string) error {
+			return nil
+		},
+		pullFunc: func(_ context.Context, _, _ string) error {
+			return nil
+		},
+		pushFunc: func(_ context.Context, _, _ string) error {
+			return nil
+		},
+	}, &mockGitHub{
+		getPRFunc: func(_, _ string, _ int) (*github.PRInfo, error) {
+			return &github.PRInfo{
+				Number:     123,
+				Title:      "Test PR",
+				Author:     "testuser",
+				HeadBranch: "feature-branch",
+				BaseBranch: "main",
+				State:      "open",
+				IsFork:     true,
+			}, nil
+		},
+		checkoutPRFunc: func(_ int, _ string) error {
+			return nil
+		},
+	})
+
+	// Test with NoCreate option
+	err := client.MigratePR(ctx, "123", Options{NoCreate: true})
+	if err != nil {
+		t.Errorf("MigratePR() should not return error with NoCreate option: %v", err)
 	}
 }

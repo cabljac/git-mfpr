@@ -69,9 +69,9 @@ func (m *mockUI) Error(err error) {
 	m.errors = append(m.errors, err)
 }
 
-func (m *mockUI) Success(message string) {}
-func (m *mockUI) Info(message string)    {}
-func (m *mockUI) Command(command string) {}
+func (m *mockUI) Success(_ string) {}
+func (m *mockUI) Info(_ string)    {}
+func (m *mockUI) Command(_ string) {}
 
 func (m *mockUI) HandleEvent(event migrate.Event) {
 	m.events = append(m.events, event)
@@ -110,7 +110,7 @@ func TestRunMigration(t *testing.T) {
 			noPush:     false,
 			noCreate:   false,
 			branchName: "",
-			migratePRFunc: func(ctx context.Context, prRef string, opts migrate.Options) error {
+			migratePRFunc: func(_ context.Context, _ string, _ migrate.Options) error {
 				return nil
 			},
 			expectError: false,
@@ -122,7 +122,7 @@ func TestRunMigration(t *testing.T) {
 			noPush:     false,
 			noCreate:   false,
 			branchName: "custom-branch",
-			migratePRFunc: func(ctx context.Context, prRef string, opts migrate.Options) error {
+			migratePRFunc: func(_ context.Context, _ string, opts migrate.Options) error {
 				if opts.BranchName != "custom-branch" {
 					t.Errorf("Expected branch name 'custom-branch', got %s", opts.BranchName)
 				}
@@ -147,7 +147,7 @@ func TestRunMigration(t *testing.T) {
 			noPush:     false,
 			noCreate:   false,
 			branchName: "",
-			migratePRFunc: func(ctx context.Context, prRef string, opts migrate.Options) error {
+			migratePRFunc: func(_ context.Context, _ string, _ migrate.Options) error {
 				return errors.New("migration failed")
 			},
 			expectError:  true,
@@ -160,7 +160,7 @@ func TestRunMigration(t *testing.T) {
 			noPush:     false,
 			noCreate:   false,
 			branchName: "",
-			migratePRFunc: func(ctx context.Context, prRef string, opts migrate.Options) error {
+			migratePRFunc: func(_ context.Context, _ string, opts migrate.Options) error {
 				if !opts.DryRun {
 					t.Error("Expected dry run mode to be enabled")
 				}
@@ -175,7 +175,7 @@ func TestRunMigration(t *testing.T) {
 			noPush:     true,
 			noCreate:   true,
 			branchName: "",
-			migratePRFunc: func(ctx context.Context, prRef string, opts migrate.Options) error {
+			migratePRFunc: func(_ context.Context, _ string, opts migrate.Options) error {
 				if !opts.NoPush {
 					t.Error("Expected no-push to be enabled")
 				}
@@ -193,7 +193,7 @@ func TestRunMigration(t *testing.T) {
 			noPush:     false,
 			noCreate:   false,
 			branchName: "",
-			migratePRFunc: func(ctx context.Context, prRef string, opts migrate.Options) error {
+			migratePRFunc: func(_ context.Context, prRef string, _ migrate.Options) error {
 				if prRef == "124" {
 					return errors.New("PR 124 failed")
 				}
@@ -283,7 +283,7 @@ func TestEventHandlerIntegration(t *testing.T) {
 
 	// Capture the event handler
 	var capturedHandler migrate.EventHandler
-	mockMigrator.migratePRFunc = func(ctx context.Context, prRef string, opts migrate.Options) error {
+	mockMigrator.migratePRFunc = func(_ context.Context, _ string, _ migrate.Options) error {
 		// Emit some events through the handler
 		if capturedHandler != nil {
 			capturedHandler(migrate.Event{Type: migrate.EventInfo, Message: "Test event"})

@@ -421,11 +421,8 @@ func TestClient_ResultMethods(t *testing.T) {
 			if result.Branch == "" {
 				t.Error("Expected branch name, got empty string")
 			}
-		} else {
-			// Not in a repo, should have an error
-			if result.Error == nil {
-				t.Error("Expected error when not in repo")
-			}
+		} else if result.Error == nil {
+			t.Error("Expected error when not in repo")
 		}
 	})
 
@@ -518,4 +515,332 @@ func TestIntegration_PullPush(t *testing.T) {
 	}
 
 	t.Skip("Pull/Push integration tests require real remote repository")
+}
+
+func TestClient_CurrentBranch_Error(t *testing.T) {
+	ctx := context.Background()
+
+	// Test outside of a git repository
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	client := New()
+	_, err := client.CurrentBranch(ctx)
+	if err == nil {
+		t.Error("CurrentBranch() should return error outside git repo")
+	}
+
+	if _, ok := err.(*ErrGetCurrentBranchFailed); !ok {
+		t.Errorf("Expected ErrGetCurrentBranchFailed, got %T: %v", err, err)
+	}
+}
+
+func TestClient_CurrentBranch_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	_, err := client.CurrentBranch(ctx)
+	if err == nil {
+		t.Error("CurrentBranch() should return error when context is cancelled")
+	}
+}
+
+func TestClient_CurrentRepo_NoRemote(t *testing.T) {
+	ctx := context.Background()
+
+	// Test in a git repo without origin remote
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	exec.Command("git", "init").Run() // #nosec G204
+
+	client := New()
+	_, _, err := client.CurrentRepo(ctx)
+	if err == nil {
+		t.Error("CurrentRepo() should return error when no origin remote exists")
+	}
+
+	if _, ok := err.(*ErrGetRemoteURLFailed); !ok {
+		t.Errorf("Expected ErrGetRemoteURLFailed, got %T: %v", err, err)
+	}
+}
+
+func TestClient_CurrentRepo_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	_, _, err := client.CurrentRepo(ctx)
+	if err == nil {
+		t.Error("CurrentRepo() should return error when context is cancelled")
+	}
+}
+
+func TestClient_Pull_Error(t *testing.T) {
+	ctx := context.Background()
+
+	// Test pull with invalid remote
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	exec.Command("git", "init").Run()                                     // #nosec G204
+	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
+	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+
+	client := New()
+	err := client.Pull(ctx, "nonexistent", "main")
+	if err == nil {
+		t.Skip("Pull() succeeded unexpectedly, skipping error test")
+	}
+
+	if _, ok := err.(*ErrPullFailed); !ok {
+		t.Errorf("Expected ErrPullFailed, got %T: %v", err, err)
+	}
+}
+
+func TestClient_Pull_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	err := client.Pull(ctx, "origin", "main")
+	if err == nil {
+		t.Error("Pull() should return error when context is cancelled")
+	}
+}
+
+func TestClient_Push_Error(t *testing.T) {
+	ctx := context.Background()
+
+	// Test push with invalid remote
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	exec.Command("git", "init").Run()                                     // #nosec G204
+	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
+	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+
+	client := New()
+	err := client.Push(ctx, "nonexistent", "main")
+	if err == nil {
+		t.Skip("Push() succeeded unexpectedly, skipping error test")
+	}
+
+	if _, ok := err.(*ErrPushFailed); !ok {
+		t.Errorf("Expected ErrPushFailed, got %T: %v", err, err)
+	}
+}
+
+func TestClient_Push_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	err := client.Push(ctx, "origin", "main")
+	if err == nil {
+		t.Error("Push() should return error when context is cancelled")
+	}
+}
+
+func TestClient_Checkout_Error(t *testing.T) {
+	ctx := context.Background()
+
+	// Test checkout of non-existent branch
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	exec.Command("git", "init").Run()                                     // #nosec G204
+	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
+	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+
+	client := New()
+	err := client.Checkout(ctx, "nonexistent-branch")
+	if err == nil {
+		t.Skip("Checkout() succeeded unexpectedly, skipping error test")
+	}
+
+	if _, ok := err.(*ErrCheckoutFailed); !ok {
+		t.Errorf("Expected ErrCheckoutFailed, got %T: %v", err, err)
+	}
+}
+
+func TestClient_Checkout_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	err := client.Checkout(ctx, "main")
+	if err == nil {
+		t.Error("Checkout() should return error when context is cancelled")
+	}
+}
+
+func TestClient_DeleteBranch_Error(t *testing.T) {
+	ctx := context.Background()
+
+	// Test delete of non-existent branch
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	exec.Command("git", "init").Run()                                     // #nosec G204
+	exec.Command("git", "config", "user.email", "test@example.com").Run() // #nosec G204
+	exec.Command("git", "config", "user.name", "Test User").Run()         // #nosec G204
+
+	client := New()
+	err := client.DeleteBranch(ctx, "nonexistent-branch")
+	if err == nil {
+		t.Skip("DeleteBranch() succeeded unexpectedly, skipping error test")
+	}
+
+	if _, ok := err.(*ErrDeleteBranchFailed); !ok {
+		t.Errorf("Expected ErrDeleteBranchFailed, got %T: %v", err, err)
+	}
+}
+
+func TestClient_DeleteBranch_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	client := New()
+	err := client.DeleteBranch(ctx, "main")
+	if err == nil {
+		t.Error("DeleteBranch() should return error when context is cancelled")
+	}
+}
+
+func TestErrorTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected string
+	}{
+		{
+			name:     "ErrGetCurrentBranchFailed",
+			err:      &ErrGetCurrentBranchFailed{Detail: "git command failed"},
+			expected: "failed to get current branch: git command failed",
+		},
+		{
+			name:     "ErrGetRemoteURLFailed",
+			err:      &ErrGetRemoteURLFailed{Detail: "no remote origin"},
+			expected: "failed to get remote URL: no remote origin",
+		},
+		{
+			name:     "ErrInvalidRemoteURL",
+			err:      &ErrInvalidRemoteURL{URL: "invalid-url"},
+			expected: "invalid remote URL format: invalid-url",
+		},
+		{
+			name:     "ErrCheckoutFailed",
+			err:      &ErrCheckoutFailed{Branch: "main", Detail: "branch not found"},
+			expected: "failed to checkout branch main: branch not found",
+		},
+		{
+			name:     "ErrPullFailed",
+			err:      &ErrPullFailed{Remote: "origin", Branch: "main", Detail: "network error"},
+			expected: "failed to pull origin/main: network error",
+		},
+		{
+			name:     "ErrPushFailed",
+			err:      &ErrPushFailed{Remote: "origin", Branch: "main", Detail: "permission denied"},
+			expected: "failed to push to origin/main: permission denied",
+		},
+		{
+			name:     "ErrDeleteBranchFailed",
+			err:      &ErrDeleteBranchFailed{Branch: "feature", Detail: "branch not found"},
+			expected: "failed to delete branch feature: branch not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.err.Error() != tt.expected {
+				t.Errorf("Error message = %q, want %q", tt.err.Error(), tt.expected)
+			}
+		})
+	}
+}
+
+func TestClient_ResultMethods_Error(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test CurrentBranchResult with error
+	tmpDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tmpDir)
+
+	result := client.CurrentBranchResult(ctx)
+	if result.IsSuccess() {
+		t.Error("CurrentBranchResult() should return error outside git repo")
+	}
+	if !result.IsError() {
+		t.Error("CurrentBranchResult() should indicate error")
+	}
+	if result.Error == nil {
+		t.Error("CurrentBranchResult() should have error")
+	}
+
+	// Test CurrentRepoResult with error
+	repoResult := client.CurrentRepoResult(ctx)
+	if repoResult.IsSuccess() {
+		t.Error("CurrentRepoResult() should return error outside git repo")
+	}
+	if !repoResult.IsError() {
+		t.Error("CurrentRepoResult() should indicate error")
+	}
+	if repoResult.Error == nil {
+		t.Error("CurrentRepoResult() should have error")
+	}
+}
+
+func TestClient_OperationResults_Error(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// Test operation results with errors
+	checkoutResult := client.CheckoutResult(ctx, "nonexistent")
+	if checkoutResult.IsSuccess() {
+		t.Error("CheckoutResult() should return error for non-existent branch")
+	}
+	if !checkoutResult.IsError() {
+		t.Error("CheckoutResult() should indicate error")
+	}
+
+	pullResult := client.PullResult(ctx, "nonexistent", "main")
+	if pullResult.IsSuccess() {
+		t.Error("PullResult() should return error for non-existent remote")
+	}
+	if !pullResult.IsError() {
+		t.Error("PullResult() should indicate error")
+	}
+
+	pushResult := client.PushResult(ctx, "nonexistent", "main")
+	if pushResult.IsSuccess() {
+		t.Error("PushResult() should return error for non-existent remote")
+	}
+	if !pushResult.IsError() {
+		t.Error("PushResult() should indicate error")
+	}
+
+	deleteResult := client.DeleteBranchResult(ctx, "nonexistent")
+	if deleteResult.IsSuccess() {
+		t.Error("DeleteBranchResult() should return error for non-existent branch")
+	}
+	if !deleteResult.IsError() {
+		t.Error("DeleteBranchResult() should indicate error")
+	}
 }

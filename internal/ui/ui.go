@@ -80,7 +80,7 @@ func FormatPRInfo(pr *migrate.PRInfo) string {
 	return strings.Join(lines, "\n")
 }
 
-func FormatCreatePRCommand(pr *migrate.PRInfo, branchName string) string {
+func FormatCreatePRCommand(pr *migrate.PRInfo, _ string) string {
 	return fmt.Sprintf(`gh pr create --title "%s" \
   --body "Migrated from #%d\nOriginal author: @%s" \
   --base %s`, pr.Title, pr.Number, pr.Author, pr.BaseBranch)

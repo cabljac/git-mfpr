@@ -264,7 +264,7 @@ func TestErrGetRemoteURLFailed_Error(t *testing.T) {
 }
 
 // Test that errors implement the error interface
-func TestErrorsImplementErrorInterface(t *testing.T) {
+func TestErrorsImplementErrorInterface(_ *testing.T) {
 	var _ error = ErrNotInRepo{}
 	var _ error = ErrInvalidRemoteURL{}
 	var _ error = ErrBranchNotFound{}

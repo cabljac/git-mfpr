@@ -37,6 +37,13 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
    git clone https://github.com/yourusername/git-mfpr.git
    cd git-mfpr
    go mod download
+   
+   # Install development tools (required for linting)
+   make install-tools
+   
+   # Ensure Go binaries are in your PATH
+   # Add this to your shell profile (.bashrc, .zshrc, etc.):
+   # export PATH="$HOME/go/bin:$PATH"
    ```
 
 2. **Make Your Changes**

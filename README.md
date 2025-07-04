@@ -25,7 +25,7 @@ While you could manually run `gh pr checkout` and `git push`, `git-mfpr` provide
 - **Validates PR is from a fork** (prevents mistakes on same-repo PRs)
 - **Checks if branch already exists** (no accidental overwrites)
 - **Verifies PR is still open** (no dead PR migrations)
-- **Smart branch naming** (consistent, safe names with length limits)
+- **Simple branch naming** (consistent, predictable names)
 
 #### **Workflow Automation**
 - **One command instead of 3-4 manual steps**
@@ -87,7 +87,7 @@ git-mfpr 123 --dry-run  # Shows them exactly what will happen
 
 - 🔄 Preserves complete commit history and authorship
 - 🚀 Simple one-command migration
-- 🎯 Smart branch naming with PR number, author, and title
+- 🎯 Simple, consistent branch naming with PR number
 - 🔍 Dry-run mode to preview actions
 - 📦 Batch migration support for multiple PRs
 - 🛡️ Safety checks to prevent accidental overwrites
@@ -215,11 +215,11 @@ Output:
 🔄 Migrating PR #123...
 📋 Title: Fix memory leak in worker pool
 👤 Author: johndoe
-🌿 Branch: pr-123-johndoe-fix-memory-leak
+🌿 Branch: migrated-123
 $ git checkout main (dry-run)
 $ git pull origin main (dry-run)
-$ gh pr checkout 123 -b pr-123-johndoe-fix-memory-leak (dry-run)
-$ git push -u origin pr-123-johndoe-fix-memory-leak (dry-run)
+$ gh pr checkout 123 -b migrated-123 (dry-run)
+$ git push -u origin migrated-123 (dry-run)
 ✅ Migration complete!
 ```
 
@@ -239,7 +239,7 @@ git-mfpr 123 --no-push
 
 1. **Fetches PR Information**: Uses `gh` CLI to get PR details
 2. **Validates**: Ensures PR is from a fork and is still open
-3. **Creates Branch**: Generates a branch name like `pr-123-author-title`
+3. **Creates Branch**: Generates a branch name like `migrated-123`
 4. **Checks Out Code**: Uses `gh pr checkout` to fetch the PR commits
 5. **Pushes to Origin**: Pushes the new branch to your repository
 6. **Suggests Next Steps**: Provides the command to create a new PR
@@ -249,14 +249,14 @@ git-mfpr 123 --no-push
 By default, branches are named using the pattern:
 
 ```
-pr-{number}-{author}-{title-slug}
+migrated-{number}
 ```
 
 For example:
-- `pr-123-johndoe-fix-memory-leak`
-- `pr-456-janedoe-add-new-feature`
+- `migrated-123`
+- `migrated-456`
 
-The title is converted to lowercase, with special characters replaced by hyphens, and limited to 40 characters.
+This simple naming convention ensures consistent and predictable branch names.
 
 ## Development
 

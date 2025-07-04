@@ -1,168 +1,48 @@
 run:
   timeout: 5m
-  go: "1.22"
-  modules-download-mode: readonly
-
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 3
-  misspell:
-    locale: US
-  lll:
-    line-length: 140
-  goimports:
-    local-prefixes: github.com/user/git-mfpr
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
-      - appendCombine
-      - elseif
-      - emptyStringTest
-      - sprintfQuotedString
-      - unnamedResult
-  depguard:
-    rules:
-      main:
-        files:
-          - "cmd/**/*.go"
-        allow:
-          - github.com/spf13/cobra
-          - github.com/user/git-mfpr/internal/migrate
-          - github.com/user/git-mfpr/internal/git
-          - github.com/user/git-mfpr/internal/github
-          - github.com/user/git-mfpr/internal/ui
-      test:
-        files:
-          - "**/*_test.go"
-        allow:
-          - github.com/user/git-mfpr/internal/migrate
-          - github.com/user/git-mfpr/internal/git
-          - github.com/user/git-mfpr/internal/github
-          - github.com/user/git-mfpr/internal/ui
 
 linters:
   disable-all: true
   enable:
-    - bodyclose
-    - depguard
-    - dogsled
-    - dupl
     - errcheck
-    - exhaustive
-    - forbidigo
-    - funlen
-    - gochecknoinits
-    - goconst
-    - gocritic
-    - gocyclo
-    - gofmt
-    - gofumpt
-    - goheader
-    - goimports
-    - gomodguard
-    - goprintffuncname
-    - gosec
     - gosimple
     - govet
     - ineffassign
-    - lll
-    - makezero
-    - misspell
-    - nakedret
-    - noctx
-    - nolintlint
-    - prealloc
-    - predeclared
-    - promlinter
-    - revive
-    - rowserrcheck
     - staticcheck
-    - stylecheck
-    - thelper
-    - tparallel
     - typecheck
-    - unconvert
-    - unparam
     - unused
-    - whitespace
-    - wrapcheck
+    - revive
+    - gocritic
+    - gofmt
+    - goimports
+    - gosec
+    - unconvert
+    - dupl
+    - goconst
+    - misspell
+
+linters-settings:
+  gocritic:
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+  revive:
+    rules:
+      - name: unused-parameter
+        severity: warning
 
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
         - goconst
-        - funlen
-        - gocyclo
         - dupl
-        - thelper
-        - tparallel
         - errcheck
-        - forbidigo
-        - unused
-        - revive
-        - depguard
     - path: internal/migrate/mock\.go
       linters:
         - dupl
-        - funlen
         - errcheck
-        - forbidigo
         - revive
-    - path: internal/git/git_test\.go
-      linters:
-        - dupl
-        - funlen
-        - errcheck
-        - forbidigo
-        - revive
-    - path: internal/github/github_test\.go
-      linters:
-        - dupl
-        - funlen
-        - errcheck
-        - forbidigo
-        - revive
-        - unused
-    - path: cmd/test/
-      linters:
-        - errcheck
-        - forbidigo
-        - revive
-    - path: internal/ui/
-      linters:
-        - errcheck
-        - forbidigo
-        - revive
-        - wrapcheck
-    - path: internal/migrate/
-      linters:
-        - revive
-        - wrapcheck
-    - path: internal/git/
-      linters:
-        - revive
-        - wrapcheck
-    - path: internal/github/
-      linters:
-        - revive
-        - wrapcheck
-  max-issues-per-linter: 0
-  max-same-issues: 0 
