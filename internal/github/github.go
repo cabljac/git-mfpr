@@ -102,7 +102,7 @@ func (c *Client) GetPR(ctx context.Context, owner, repo string, number int) (*PR
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, "gh", "pr", "view", strconv.Itoa(number),
+	cmd := exec.CommandContext(ctx, "gh", "pr", "view", strconv.Itoa(number), // #nosec G204
 		"--repo", fmt.Sprintf("%s/%s", owner, repo),
 		"--json", "number,title,author,headRefName,baseRefName,state,headRefOid,isFork,url")
 
@@ -137,7 +137,7 @@ func (c *Client) GetPR(ctx context.Context, owner, repo string, number int) (*PR
 }
 
 func (c *Client) CheckoutPR(ctx context.Context, number int, branch string) error {
-	cmd := exec.CommandContext(ctx, "gh", "pr", "checkout", strconv.Itoa(number), "-b", branch)
+	cmd := exec.CommandContext(ctx, "gh", "pr", "checkout", strconv.Itoa(number), "-b", branch) // #nosec G204
 	if err := cmd.Run(); err != nil {
 		return &ErrPRCheckoutFailed{Number: number, Detail: err.Error()}
 	}

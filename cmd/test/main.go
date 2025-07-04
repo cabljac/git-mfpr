@@ -41,7 +41,6 @@ func main() {
 	err := m.MigratePR(ctx, os.Args[1], migrate.Options{
 		DryRun: true,
 	})
-
 	if err != nil {
 		log.Fatal(err)
 	}

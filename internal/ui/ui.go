@@ -35,16 +35,16 @@ func (ui *ConsoleUI) StartPR(prRef string) {
 
 func (ui *ConsoleUI) HandleEvent(event migrate.Event) {
 	switch event.Type {
-	case "info":
+	case migrate.EventInfo:
 		ui.Info(event.Message)
-	case "success":
+	case migrate.EventSuccess:
 		ui.Success(event.Message)
-	case "error":
+	case migrate.EventError:
 		ui.Error(fmt.Errorf("%s", event.Message))
-	case "command":
+	case migrate.EventCommand:
 		ui.Command(event.Detail)
-	case "step":
-		fmt.Printf("→ %s\n", event.Message)
+	default:
+		// handle unknown event types if needed
 	}
 }
 

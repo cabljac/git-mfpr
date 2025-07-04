@@ -61,18 +61,23 @@ func (m *mockGit) IsInRepo(ctx context.Context) bool                   { return 
 func (m *mockGit) CurrentBranchResult(ctx context.Context) *git.BranchResult {
 	return &git.BranchResult{Branch: "main"}
 }
+
 func (m *mockGit) CurrentRepoResult(ctx context.Context) *git.RepoResult {
 	return &git.RepoResult{Owner: "testowner", Repo: "testrepo"}
 }
+
 func (m *mockGit) CheckoutResult(ctx context.Context, branch string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
+
 func (m *mockGit) PullResult(ctx context.Context, remote, branch string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
+
 func (m *mockGit) PushResult(ctx context.Context, remote, branch string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
+
 func (m *mockGit) DeleteBranchResult(ctx context.Context, name string) *git.OperationResult {
 	return &git.OperationResult{Success: true}
 }
@@ -205,7 +210,10 @@ func TestParsePRRef_CurrentRepoError(t *testing.T) {
 	}
 
 	client := newTestClient(mockGit, &mockGitHub{})
-	_, _, _, err := client.parsePRRef("123")
+	err := func() error {
+		_, _, _, err := client.parsePRRef("123")
+		return err
+	}()
 
 	if err == nil {
 		t.Error("parsePRRef() should return error when not in git repo")
@@ -239,7 +247,6 @@ func TestGetPRInfo(t *testing.T) {
 
 	client := newTestClient(&mockGit{}, mockGitHub)
 	pr, err := client.GetPRInfo(ctx, "123")
-
 	if err != nil {
 		t.Errorf("GetPRInfo() error = %v", err)
 		return
@@ -387,7 +394,6 @@ func TestMigratePR_Success(t *testing.T) {
 	client.SetEventHandler(handler)
 
 	err := client.MigratePR(ctx, "123", Options{})
-
 	if err != nil {
 		t.Errorf("MigratePR() error = %v", err)
 	}
@@ -527,7 +533,6 @@ func TestMigratePR_DryRun(t *testing.T) {
 	client.SetEventHandler(handler)
 
 	err := client.MigratePR(ctx, "123", Options{DryRun: true})
-
 	if err != nil {
 		t.Errorf("MigratePR() error = %v", err)
 	}
@@ -605,7 +610,6 @@ func TestMigratePRs_Success(t *testing.T) {
 	client.SetEventHandler(handler)
 
 	err := client.MigratePRs(ctx, []string{"123", "124"}, Options{})
-
 	if err != nil {
 		t.Errorf("MigratePRs() error = %v", err)
 	}

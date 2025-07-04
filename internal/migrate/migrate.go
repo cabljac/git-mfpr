@@ -143,7 +143,7 @@ func (c *Client) GenerateBranchName(pr *PRInfo) string {
 		baseLen := len(fmt.Sprintf("pr-%d-%s-", pr.Number, pr.Author))
 		maxSlugLen := 80 - baseLen
 		if maxSlugLen > 0 {
-			titleSlug = titleSlug[:min(len(titleSlug), maxSlugLen)]
+			titleSlug = titleSlug[:minInt(len(titleSlug), maxSlugLen)]
 			branchName = fmt.Sprintf("pr-%d-%s-%s", pr.Number, pr.Author, titleSlug)
 		}
 	}
@@ -167,11 +167,70 @@ func slugify(s string) string {
 	return s
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
+}
+
+func (c *Client) validatePRState(pr *PRInfo) error {
+	if !pr.IsFork {
+		c.emit(EventError, "PR is not from a fork", "")
+		return &ErrPRNotFork{Number: pr.Number}
+	}
+	if pr.State != "open" {
+		c.emit(EventError, fmt.Sprintf("PR is %s", pr.State), "")
+		return &ErrPRClosed{Number: pr.Number, State: pr.State}
+	}
+	return nil
+}
+
+func (c *Client) emitPRInfo(pr *PRInfo) {
+	c.emit(EventInfo, fmt.Sprintf("Title: %s", pr.Title), "")
+	c.emit(EventInfo, fmt.Sprintf("Author: %s", pr.Author), "")
+}
+
+func (c *Client) handleDryRun(pr *PRInfo, branchName string, opts Options) {
+	c.emit(EventCommand, "Would execute:", "git checkout "+pr.BaseBranch)
+	c.emit(EventCommand, "Would execute:", "git pull origin "+pr.BaseBranch)
+	c.emit(EventCommand, "Would execute:", fmt.Sprintf("gh pr checkout %d -b %s", pr.Number, branchName))
+	if !opts.NoPush {
+		c.emit(EventCommand, "Would execute:", "git push -u origin "+branchName)
+	}
+	if !opts.NoCreate {
+		c.emit(EventInfo, "Would suggest creating PR with:", "")
+		c.emit(EventCommand, "", fmt.Sprintf(`gh pr create --title "%s" --body "Migrated from #%d\nOriginal author: @%s" --base %s`,
+			pr.Title, pr.Number, pr.Author, pr.BaseBranch))
+	}
+}
+
+func (c *Client) checkoutAndPullBase(ctx context.Context, pr *PRInfo) error {
+	c.emit(EventInfo, fmt.Sprintf("Switching to %s branch...", pr.BaseBranch), "")
+	if err := c.git.Checkout(ctx, pr.BaseBranch); err != nil {
+		return err
+	}
+	c.emit(EventInfo, "Pulling latest changes...", "")
+	if err := c.git.Pull(ctx, "origin", pr.BaseBranch); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) pushAndEmit(ctx context.Context, branchName string) error {
+	c.emit(EventInfo, "Pushing to origin...", "")
+	if err := c.git.Push(ctx, "origin", branchName); err != nil {
+		return err
+	}
+	c.emit(EventSuccess, "Pushed to origin", "")
+	return nil
+}
+
+func (c *Client) emitCreatePR(pr *PRInfo) {
+	c.emit(EventInfo, "", "")
+	c.emit(EventInfo, "Create PR with:", "")
+	c.emit(EventCommand, "", fmt.Sprintf(`gh pr create --title "%s" --body "Migrated from #%d\nOriginal author: @%s" --base %s`,
+		pr.Title, pr.Number, pr.Author, pr.BaseBranch))
 }
 
 func (c *Client) MigratePR(ctx context.Context, prRef string, opts Options) error {
@@ -181,25 +240,17 @@ func (c *Client) MigratePR(ctx context.Context, prRef string, opts Options) erro
 	}
 
 	c.emit(EventInfo, fmt.Sprintf("Migrating PR #%d from %s/%s", number, owner, repo), "")
-
 	c.emit(EventInfo, "Fetching PR information...", "")
 	pr, err := c.github.GetPR(ctx, owner, repo, number)
 	if err != nil {
 		return err
 	}
 
-	if !pr.IsFork {
-		c.emit(EventError, "PR is not from a fork", "")
-		return &ErrPRNotFork{Number: pr.Number}
+	if err := c.validatePRState(pr); err != nil {
+		return err
 	}
 
-	if pr.State != "open" {
-		c.emit(EventError, fmt.Sprintf("PR is %s", pr.State), "")
-		return &ErrPRClosed{Number: pr.Number, State: pr.State}
-	}
-
-	c.emit(EventInfo, fmt.Sprintf("Title: %s", pr.Title), "")
-	c.emit(EventInfo, fmt.Sprintf("Author: %s", pr.Author), "")
+	c.emitPRInfo(pr)
 
 	branchName := opts.BranchName
 	if branchName == "" {
@@ -212,27 +263,11 @@ func (c *Client) MigratePR(ctx context.Context, prRef string, opts Options) erro
 	}
 
 	if opts.DryRun {
-		c.emit(EventCommand, "Would execute:", "git checkout "+pr.BaseBranch)
-		c.emit(EventCommand, "Would execute:", "git pull origin "+pr.BaseBranch)
-		c.emit(EventCommand, "Would execute:", fmt.Sprintf("gh pr checkout %d -b %s", pr.Number, branchName))
-		if !opts.NoPush {
-			c.emit(EventCommand, "Would execute:", "git push -u origin "+branchName)
-		}
-		if !opts.NoCreate {
-			c.emit(EventInfo, "Would suggest creating PR with:", "")
-			c.emit(EventCommand, "", fmt.Sprintf(`gh pr create --title "%s" --body "Migrated from #%d\nOriginal author: @%s" --base %s`,
-				pr.Title, pr.Number, pr.Author, pr.BaseBranch))
-		}
+		c.handleDryRun(pr, branchName, opts)
 		return nil
 	}
 
-	c.emit(EventInfo, fmt.Sprintf("Switching to %s branch...", pr.BaseBranch), "")
-	if err := c.git.Checkout(ctx, pr.BaseBranch); err != nil {
-		return err
-	}
-
-	c.emit(EventInfo, "Pulling latest changes...", "")
-	if err := c.git.Pull(ctx, "origin", pr.BaseBranch); err != nil {
+	if err := c.checkoutAndPullBase(ctx, pr); err != nil {
 		return err
 	}
 
@@ -242,20 +277,15 @@ func (c *Client) MigratePR(ctx context.Context, prRef string, opts Options) erro
 	}
 
 	if !opts.NoPush {
-		c.emit(EventInfo, "Pushing to origin...", "")
-		if err := c.git.Push(ctx, "origin", branchName); err != nil {
+		if err := c.pushAndEmit(ctx, branchName); err != nil {
 			return err
 		}
-		c.emit(EventSuccess, "Pushed to origin", "")
 	}
 
 	c.emit(EventSuccess, fmt.Sprintf("Successfully migrated PR #%d", pr.Number), "")
 
 	if !opts.NoCreate && !opts.NoPush {
-		c.emit(EventInfo, "", "")
-		c.emit(EventInfo, "Create PR with:", "")
-		c.emit(EventCommand, "", fmt.Sprintf(`gh pr create --title "%s" --body "Migrated from #%d\nOriginal author: @%s" --base %s`,
-			pr.Title, pr.Number, pr.Author, pr.BaseBranch))
+		c.emitCreatePR(pr)
 	}
 
 	return nil

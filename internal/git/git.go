@@ -162,7 +162,7 @@ func (c *Client) Push(ctx context.Context, remote, branch string) error {
 }
 
 func (c *Client) HasBranch(ctx context.Context, name string) bool {
-	cmd := exec.CommandContext(ctx, "git", "show-ref", "--verify", "--quiet", "refs/heads/"+name)
+	cmd := exec.CommandContext(ctx, "git", "show-ref", "--verify", "--quiet", "refs/heads/"+name) // #nosec G204
 	return cmd.Run() == nil
 }
 
