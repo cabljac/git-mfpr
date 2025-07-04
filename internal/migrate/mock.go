@@ -86,16 +86,7 @@ func (m *MockMigrator) GetPRInfo(ctx context.Context, prRef string) (*PRInfo, er
 }
 
 func (m *MockMigrator) GenerateBranchName(pr *PRInfo) string {
-	slug := strings.ToLower(pr.Title)
-	slug = regexp.MustCompile(`[^a-z0-9-]+`).ReplaceAllString(slug, "-")
-	slug = strings.Trim(slug, "-")
-
-	if len(slug) > 40 {
-		slug = slug[:40]
-		slug = strings.TrimRight(slug, "-")
-	}
-
-	return fmt.Sprintf("pr-%d-%s-%s", pr.Number, strings.ToLower(pr.Author), slug)
+	return fmt.Sprintf("migrated-%d", pr.Number)
 }
 
 func (m *MockMigrator) emit(eventType EventType, message, detail string) {

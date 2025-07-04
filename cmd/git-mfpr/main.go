@@ -53,8 +53,15 @@ Examples:
 }
 
 func run(_ *cobra.Command, args []string) {
-	ui := ui.NewWithOptions(dryRun)
+	uiInstance := ui.NewWithOptions(dryRun)
+	migrator := migrate.New()
 
+	if err := runMigration(args, uiInstance, migrator); err != nil {
+		os.Exit(1)
+	}
+}
+
+func runMigration(args []string, ui ui.UI, migrator migrate.Migrator) error {
 	opts := migrate.Options{
 		DryRun:     dryRun,
 		NoPush:     noPush,
@@ -64,10 +71,10 @@ func run(_ *cobra.Command, args []string) {
 
 	if branchName != "" && len(args) > 1 {
 		ui.Error(fmt.Errorf("--branch-name can only be used with a single PR"))
-		os.Exit(1)
+		return fmt.Errorf("--branch-name can only be used with a single PR")
 	}
 
-	migrator := migrate.NewMockMigrator(func(event migrate.Event) {
+	migrator.SetEventHandler(func(event migrate.Event) {
 		ui.HandleEvent(event)
 	})
 
@@ -84,6 +91,8 @@ func run(_ *cobra.Command, args []string) {
 	}
 
 	if failed {
-		os.Exit(1)
+		return fmt.Errorf("one or more migrations failed")
 	}
+
+	return nil
 }

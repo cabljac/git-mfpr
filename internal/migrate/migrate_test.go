@@ -103,7 +103,7 @@ func (m *mockGitHub) GetPR(ctx context.Context, owner, repo string, number int) 
 	}, nil
 }
 
-func (m *mockGitHub) CheckoutPR(ctx context.Context, number int, branch string) error {
+func (m *mockGitHub) CheckoutPR(ctx context.Context, owner, repo string, number int, branch string) error {
 	if m.checkoutPRFunc != nil {
 		return m.checkoutPRFunc(number, branch)
 	}
@@ -270,31 +270,31 @@ func TestGenerateBranchName(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "normal title",
+			name: "normal PR",
 			pr: &PRInfo{
 				Number: 123,
 				Author: "testuser",
 				Title:  "Fix memory leak in worker pool",
 			},
-			expected: "pr-123-testuser-fix-memory-leak-in-worker-pool",
+			expected: "migrated-123",
 		},
 		{
-			name: "title with special characters",
+			name: "PR with special characters in title",
 			pr: &PRInfo{
 				Number: 456,
 				Author: "user",
 				Title:  "Add new feature! (WIP) - Part 1/2",
 			},
-			expected: "pr-456-user-add-new-feature-wip-part-1-2",
+			expected: "migrated-456",
 		},
 		{
-			name: "very long title",
+			name: "PR with very long title",
 			pr: &PRInfo{
 				Number: 789,
 				Author: "longauthor",
 				Title:  "This is a very long title that should be truncated to fit within the branch name length limit of 80 characters",
 			},
-			expected: "pr-789-longauthor-this-is-a-very-long-title-that-should-be",
+			expected: "migrated-789",
 		},
 	}
 

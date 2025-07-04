@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"testing"
@@ -272,26 +273,6 @@ func TestNewWithOptions(t *testing.T) {
 	}
 }
 
-func TestResultTypes(t *testing.T) {
-	ctx := context.Background()
-	client := New()
-
-	branchResult := client.CurrentBranchResult(ctx)
-	if branchResult == nil {
-		t.Error("CurrentBranchResult() returned nil")
-	}
-
-	repoResult := client.CurrentRepoResult(ctx)
-	if repoResult == nil {
-		t.Error("CurrentRepoResult() returned nil")
-	}
-
-	opResult := client.CheckoutResult(ctx, "main")
-	if opResult == nil {
-		t.Error("CheckoutResult() returned nil")
-	}
-}
-
 func TestContextCancellation(t *testing.T) {
 	// Skip this test as it's not reliable in CI environments
 	// The git command completes too quickly for context cancellation to be meaningful
@@ -306,6 +287,229 @@ func TestContextCancellation(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error due to context cancellation")
 	}
+}
+
+func TestResultTypes(t *testing.T) {
+	t.Run("BranchResult", func(t *testing.T) {
+		// Test success case
+		br := &BranchResult{Branch: "main", Error: nil}
+		if !br.IsSuccess() {
+			t.Error("IsSuccess() should return true when Error is nil")
+		}
+		if br.IsError() {
+			t.Error("IsError() should return false when Error is nil")
+		}
+
+		// Test error case
+		br2 := &BranchResult{Branch: "", Error: errors.New("test error")}
+		if br2.IsSuccess() {
+			t.Error("IsSuccess() should return false when Error is not nil")
+		}
+		if !br2.IsError() {
+			t.Error("IsError() should return true when Error is not nil")
+		}
+	})
+
+	t.Run("RepoResult", func(t *testing.T) {
+		// Test success case
+		rr := &RepoResult{Owner: "owner", Repo: "repo", Error: nil}
+		if !rr.IsSuccess() {
+			t.Error("IsSuccess() should return true when Error is nil")
+		}
+		if rr.IsError() {
+			t.Error("IsError() should return false when Error is nil")
+		}
+
+		// Test error case
+		rr2 := &RepoResult{Owner: "", Repo: "", Error: errors.New("test error")}
+		if rr2.IsSuccess() {
+			t.Error("IsSuccess() should return false when Error is not nil")
+		}
+		if !rr2.IsError() {
+			t.Error("IsError() should return true when Error is not nil")
+		}
+	})
+
+	t.Run("OperationResult", func(t *testing.T) {
+		// Test success case
+		or := &OperationResult{Success: true, Error: nil}
+		if !or.IsSuccess() {
+			t.Error("IsSuccess() should return true when Success is true")
+		}
+		if or.IsError() {
+			t.Error("IsError() should return false when Success is true")
+		}
+
+		// Test error case
+		or2 := &OperationResult{Success: false, Error: errors.New("test error")}
+		if or2.IsSuccess() {
+			t.Error("IsSuccess() should return false when Success is false")
+		}
+		if !or2.IsError() {
+			t.Error("IsError() should return true when Success is false")
+		}
+	})
+}
+
+func TestClient_Pull(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	if !client.IsInRepo(ctx) {
+		t.Skip("Not in a git repository")
+	}
+
+	// Test pulling from a non-existent remote
+	err := client.Pull(ctx, "nonexistent-remote", "main")
+	if err == nil {
+		t.Error("Expected error when pulling from non-existent remote")
+	}
+
+	if pullErr, ok := err.(*ErrPullFailed); !ok {
+		t.Errorf("Expected ErrPullFailed, got %T", err)
+	} else {
+		if pullErr.Remote != "nonexistent-remote" {
+			t.Errorf("Expected remote 'nonexistent-remote', got '%s'", pullErr.Remote)
+		}
+		if pullErr.Branch != "main" {
+			t.Errorf("Expected branch 'main', got '%s'", pullErr.Branch)
+		}
+	}
+}
+
+func TestClient_Push(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	if !client.IsInRepo(ctx) {
+		t.Skip("Not in a git repository")
+	}
+
+	// Test pushing to a non-existent remote
+	err := client.Push(ctx, "nonexistent-remote", "main")
+	if err == nil {
+		t.Error("Expected error when pushing to non-existent remote")
+	}
+
+	if pushErr, ok := err.(*ErrPushFailed); !ok {
+		t.Errorf("Expected ErrPushFailed, got %T", err)
+	} else {
+		if pushErr.Remote != "nonexistent-remote" {
+			t.Errorf("Expected remote 'nonexistent-remote', got '%s'", pushErr.Remote)
+		}
+		if pushErr.Branch != "main" {
+			t.Errorf("Expected branch 'main', got '%s'", pushErr.Branch)
+		}
+	}
+}
+
+func TestClient_ResultMethods(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	t.Run("CurrentBranchResult", func(t *testing.T) {
+		result := client.CurrentBranchResult(ctx)
+		if result == nil {
+			t.Fatal("CurrentBranchResult returned nil")
+		}
+
+		if client.IsInRepo(ctx) {
+			// In a repo, should have a branch
+			if result.Error != nil {
+				t.Errorf("Expected no error, got %v", result.Error)
+			}
+			if result.Branch == "" {
+				t.Error("Expected branch name, got empty string")
+			}
+		} else {
+			// Not in a repo, should have an error
+			if result.Error == nil {
+				t.Error("Expected error when not in repo")
+			}
+		}
+	})
+
+	t.Run("CurrentRepoResult", func(t *testing.T) {
+		result := client.CurrentRepoResult(ctx)
+		if result == nil {
+			t.Fatal("CurrentRepoResult returned nil")
+		}
+
+		// This will likely have an error in test environment
+		// Just verify the method works
+	})
+
+	t.Run("CheckoutResult", func(t *testing.T) {
+		if !client.IsInRepo(ctx) {
+			t.Skip("Not in a git repository")
+		}
+
+		result := client.CheckoutResult(ctx, "nonexistent-branch-12345")
+		if result == nil {
+			t.Fatal("CheckoutResult returned nil")
+		}
+
+		if result.Success {
+			t.Error("Expected failure when checking out non-existent branch")
+		}
+		if result.Error == nil {
+			t.Error("Expected error when checking out non-existent branch")
+		}
+	})
+
+	t.Run("PullResult", func(t *testing.T) {
+		if !client.IsInRepo(ctx) {
+			t.Skip("Not in a git repository")
+		}
+
+		result := client.PullResult(ctx, "nonexistent-remote", "main")
+		if result == nil {
+			t.Fatal("PullResult returned nil")
+		}
+
+		if result.Success {
+			t.Error("Expected failure when pulling from non-existent remote")
+		}
+		if result.Error == nil {
+			t.Error("Expected error when pulling from non-existent remote")
+		}
+	})
+
+	t.Run("PushResult", func(t *testing.T) {
+		if !client.IsInRepo(ctx) {
+			t.Skip("Not in a git repository")
+		}
+
+		result := client.PushResult(ctx, "nonexistent-remote", "main")
+		if result == nil {
+			t.Fatal("PushResult returned nil")
+		}
+
+		if result.Success {
+			t.Error("Expected failure when pushing to non-existent remote")
+		}
+		if result.Error == nil {
+			t.Error("Expected error when pushing to non-existent remote")
+		}
+	})
+
+	t.Run("DeleteBranchResult", func(t *testing.T) {
+		if !client.IsInRepo(ctx) {
+			t.Skip("Not in a git repository")
+		}
+
+		result := client.DeleteBranchResult(ctx, "nonexistent-branch-12345")
+		if result == nil {
+			t.Fatal("DeleteBranchResult returned nil")
+		}
+
+		if result.Success {
+			t.Error("Expected failure when deleting non-existent branch")
+		}
+		if result.Error == nil {
+			t.Error("Expected error when deleting non-existent branch")
+		}
+	})
 }
 
 func TestIntegration_PullPush(t *testing.T) {

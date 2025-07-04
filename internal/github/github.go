@@ -24,7 +24,7 @@ type PRInfo struct {
 
 type GitHub interface {
 	GetPR(ctx context.Context, owner, repo string, number int) (*PRInfo, error)
-	CheckoutPR(ctx context.Context, number int, branch string) error
+	CheckoutPR(ctx context.Context, owner, repo string, number int, branch string) error
 	CreatePR(ctx context.Context, title, body, base string) error
 	IsGHInstalled(ctx context.Context) error
 }
@@ -58,15 +58,15 @@ func NewWithOptions(opts ...Option) GitHub {
 }
 
 type ghPRResponse struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	State       string `json:"state"`
-	HeadRefName string `json:"headRefName"`
-	BaseRefName string `json:"baseRefName"`
-	HeadRefOID  string `json:"headRefOid"`
-	IsFork      bool   `json:"isFork"`
-	URL         string `json:"url"`
-	Author      struct {
+	Number            int    `json:"number"`
+	Title             string `json:"title"`
+	State             string `json:"state"`
+	HeadRefName       string `json:"headRefName"`
+	BaseRefName       string `json:"baseRefName"`
+	HeadRefOID        string `json:"headRefOid"`
+	IsCrossRepository bool   `json:"isCrossRepository"`
+	URL               string `json:"url"`
+	Author            struct {
 		Login string `json:"login"`
 	} `json:"author"`
 }
@@ -104,7 +104,7 @@ func (c *Client) GetPR(ctx context.Context, owner, repo string, number int) (*PR
 
 	cmd := exec.CommandContext(ctx, "gh", "pr", "view", strconv.Itoa(number), // #nosec G204
 		"--repo", fmt.Sprintf("%s/%s", owner, repo),
-		"--json", "number,title,author,headRefName,baseRefName,state,headRefOid,isFork,url")
+		"--json", "number,title,author,headRefName,baseRefName,state,headRefOid,isCrossRepository,url")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -132,14 +132,21 @@ func (c *Client) GetPR(ctx context.Context, owner, repo string, number int) (*PR
 		State:      pr.State,
 		URL:        pr.URL,
 		HeadRefOID: pr.HeadRefOID,
-		IsFork:     pr.IsFork,
+		IsFork:     pr.IsCrossRepository,
 	}, nil
 }
 
-func (c *Client) CheckoutPR(ctx context.Context, number int, branch string) error {
-	cmd := exec.CommandContext(ctx, "gh", "pr", "checkout", strconv.Itoa(number), "-b", branch) // #nosec G204
-	if err := cmd.Run(); err != nil {
-		return &ErrPRCheckoutFailed{Number: number, Detail: err.Error()}
+func (c *Client) CheckoutPR(ctx context.Context, owner, repo string, number int, branch string) error {
+	cmd := exec.CommandContext(ctx, "gh", "pr", "checkout", strconv.Itoa(number),
+		"--repo", fmt.Sprintf("%s/%s", owner, repo),
+		"-b", branch) // #nosec G204
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		detail := err.Error()
+		if len(output) > 0 {
+			detail = string(output)
+		}
+		return &ErrPRCheckoutFailed{Number: number, Detail: detail}
 	}
 	return nil
 }

@@ -136,19 +136,8 @@ func (c *Client) GetPRInfo(ctx context.Context, prRef string) (*PRInfo, error) {
 }
 
 func (c *Client) GenerateBranchName(pr *PRInfo) string {
-	titleSlug := slugify(pr.Title)
-	branchName := fmt.Sprintf("pr-%d-%s-%s", pr.Number, pr.Author, titleSlug)
-
-	if len(branchName) > 80 {
-		baseLen := len(fmt.Sprintf("pr-%d-%s-", pr.Number, pr.Author))
-		maxSlugLen := 80 - baseLen
-		if maxSlugLen > 0 {
-			titleSlug = titleSlug[:minInt(len(titleSlug), maxSlugLen)]
-			branchName = fmt.Sprintf("pr-%d-%s-%s", pr.Number, pr.Author, titleSlug)
-		}
-	}
-
-	return branchName
+	// Simple, clear branch name: migrated-<PR-number>
+	return fmt.Sprintf("migrated-%d", pr.Number)
 }
 
 func slugify(s string) string {
@@ -167,20 +156,14 @@ func slugify(s string) string {
 	return s
 }
 
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func (c *Client) validatePRState(pr *PRInfo) error {
 	if !pr.IsFork {
-		c.emit(EventError, "PR is not from a fork", "")
+		c.emit(EventError, "PR is not from a fork (it's from the same repository)", "")
 		return &ErrPRNotFork{Number: pr.Number}
 	}
-	if pr.State != "open" {
-		c.emit(EventError, fmt.Sprintf("PR is %s", pr.State), "")
+	// GitHub returns state in uppercase, so we need to compare case-insensitively
+	if !strings.EqualFold(pr.State, "open") {
+		c.emit(EventError, fmt.Sprintf("PR is %s (only open PRs can be migrated)", pr.State), "")
 		return &ErrPRClosed{Number: pr.Number, State: pr.State}
 	}
 	return nil
@@ -189,6 +172,12 @@ func (c *Client) validatePRState(pr *PRInfo) error {
 func (c *Client) emitPRInfo(pr *PRInfo) {
 	c.emit(EventInfo, fmt.Sprintf("Title: %s", pr.Title), "")
 	c.emit(EventInfo, fmt.Sprintf("Author: %s", pr.Author), "")
+	c.emit(EventInfo, fmt.Sprintf("Base branch: %s", pr.BaseBranch), "")
+	if pr.IsFork {
+		c.emit(EventInfo, "PR is from a fork", "")
+	} else {
+		c.emit(EventInfo, "PR is from the same repository", "")
+	}
 }
 
 func (c *Client) handleDryRun(pr *PRInfo, branchName string, opts Options) {
@@ -272,7 +261,7 @@ func (c *Client) MigratePR(ctx context.Context, prRef string, opts Options) erro
 	}
 
 	c.emit(EventInfo, fmt.Sprintf("Checking out PR #%d...", pr.Number), "")
-	if err := c.github.CheckoutPR(ctx, pr.Number, branchName); err != nil {
+	if err := c.github.CheckoutPR(ctx, owner, repo, pr.Number, branchName); err != nil {
 		return err
 	}
 

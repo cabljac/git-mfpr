@@ -13,13 +13,9 @@ help: ## Show this help message
 build: ## Build the git-mfpr binary
 	go build -o bin/git-mfpr ./cmd/git-mfpr/
 
-build-test: ## Build the test binary
-	go build -o bin/test ./cmd/test/
-
 build-all: ## Build all binaries
 	mkdir -p bin
 	go build -o bin/git-mfpr ./cmd/git-mfpr/
-	go build -o bin/test ./cmd/test/
 
 # Test targets
 test: ## Run tests
@@ -29,7 +25,9 @@ test-race: ## Run tests with race detection
 	go test -v -race ./...
 
 test-coverage: ## Run tests with coverage
-	go test -v -coverprofile=coverage.out ./...
+	go test -v -coverprofile=coverage.out -coverpkg=./... ./...
+	grep -v "mock.go" coverage.out > coverage.filtered.out
+	mv coverage.filtered.out coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 

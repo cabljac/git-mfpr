@@ -52,7 +52,7 @@ func TestPRInfoJSON(t *testing.T) {
 		"headRefName": "feature-branch",
 		"baseRefName": "main",
 		"headRefOid": "abc123",
-		"isFork": true,
+		"isCrossRepository": true,
 		"url": "https://github.com/owner/repo/pull/123",
 		"author": {
 			"login": "johndoe"
@@ -74,8 +74,8 @@ func TestPRInfoJSON(t *testing.T) {
 	if pr.Author.Login != "johndoe" {
 		t.Errorf("Author = %s, want 'johndoe'", pr.Author.Login)
 	}
-	if !pr.IsFork {
-		t.Error("IsFork = false, want true")
+	if !pr.IsCrossRepository {
+		t.Error("IsCrossRepository = false, want true")
 	}
 }
 
@@ -130,10 +130,6 @@ func TestPRResult(t *testing.T) {
 	}
 }
 
-func containsString(s, substr string) bool {
-	return len(substr) > 0 && len(s) >= len(substr) && s[:len(substr)] == substr
-}
-
 func isErrGHNotInstalled(err error) bool {
 	_, ok := err.(*ErrGHNotInstalled)
 	return ok
@@ -171,7 +167,7 @@ func TestGetPR_ParseErrors(t *testing.T) {
 				"headRefName": "feature",
 				"baseRefName": "main",
 				"headRefOid": "abc123",
-				"isFork": true,
+				"isCrossRepository": true,
 				"url": "https://github.com/owner/repo/pull/123",
 				"author": {"login": "user"}
 			}`,
@@ -190,6 +186,50 @@ func TestGetPR_ParseErrors(t *testing.T) {
 	}
 }
 
+func TestClient_CheckoutPR(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// This test will only pass if gh CLI is installed and can be mocked
+	// Since we can't easily mock exec.Command in this test, we'll skip if gh is not installed
+	if err := client.IsGHInstalled(ctx); err != nil {
+		t.Skip("gh CLI not installed, skipping CheckoutPR test")
+	}
+
+	// We can't actually test this without side effects, so we'll just verify the error handling
+	err := client.CheckoutPR(ctx, "testowner", "testrepo", 99999, "test-branch")
+	if err == nil {
+		t.Error("Expected error for non-existent PR, got nil")
+	}
+
+	if _, ok := err.(*ErrPRCheckoutFailed); !ok {
+		t.Errorf("Expected ErrPRCheckoutFailed, got %T", err)
+	}
+}
+
+func TestClient_CreatePR(t *testing.T) {
+	ctx := context.Background()
+	client := New()
+
+	// This test will only pass if gh CLI is installed
+	if err := client.IsGHInstalled(ctx); err != nil {
+		t.Skip("gh CLI not installed, skipping CreatePR test")
+	}
+
+	// We can't actually create a PR in tests, so we'll just verify the method exists
+	// and returns an error when not in a git repo or without proper setup
+	err := client.CreatePR(ctx, "Test PR", "Test body", "main")
+	if err == nil {
+		// If no error, we might be in a real repo with gh auth, which we don't want
+		t.Skip("Skipping to avoid creating real PR")
+	}
+
+	// Verify it returns the correct error type
+	if _, ok := err.(*ErrPRCreateFailed); !ok {
+		t.Errorf("Expected ErrPRCreateFailed, got %T", err)
+	}
+}
+
 func BenchmarkPRInfoParsing(b *testing.B) {
 	jsonData := `{
 		"number": 123,
@@ -198,7 +238,7 @@ func BenchmarkPRInfoParsing(b *testing.B) {
 		"headRefName": "fix-memory-leak",
 		"baseRefName": "main",
 		"headRefOid": "abc123def456",
-		"isFork": true,
+		"isCrossRepository": true,
 		"url": "https://github.com/owner/repo/pull/123",
 		"author": {
 			"login": "johndoe"
