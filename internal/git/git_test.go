@@ -145,14 +145,18 @@ func TestClient_CurrentBranch(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	// Initialize git repo
 	runGitCommand(t, "init", "-b", "main")
 	runGitCommand(t, "config", "user.email", "test@example.com")
 	runGitCommand(t, "config", "user.name", "Test User")
 
-	os.WriteFile("test.txt", []byte("test"), 0o600)
+	if err := os.WriteFile("test.txt", []byte("test"), 0o600); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
 	runGitCommand(t, "add", ".")
 	runGitCommand(t, "commit", "-m", "initial")
 
@@ -184,7 +188,9 @@ func TestClient_IsInRepo(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	if client.IsInRepo(ctx) {
 		t.Error("IsInRepo() returned true outside git repo")
@@ -202,14 +208,18 @@ func TestClient_Checkout(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	// Initialize git repo
 	runGitCommand(t, "init", "-b", "main")
 	runGitCommand(t, "config", "user.email", "test@example.com")
 	runGitCommand(t, "config", "user.name", "Test User")
 
-	os.WriteFile("test.txt", []byte("test"), 0o600)
+	if err := os.WriteFile("test.txt", []byte("test"), 0o600); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
 	runGitCommand(t, "add", ".")
 	runGitCommand(t, "commit", "-m", "initial")
 
@@ -241,14 +251,18 @@ func TestClient_DeleteBranch(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	// Initialize git repo
 	runGitCommand(t, "init", "-b", "main")
 	runGitCommand(t, "config", "user.email", "test@example.com")
 	runGitCommand(t, "config", "user.name", "Test User")
 
-	os.WriteFile("test.txt", []byte("test"), 0o600)
+	if err := os.WriteFile("test.txt", []byte("test"), 0o600); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
 	runGitCommand(t, "add", ".")
 	runGitCommand(t, "commit", "-m", "initial")
 
@@ -538,7 +552,9 @@ func TestClient_CurrentBranch_Error(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	client := New()
 	_, err := client.CurrentBranch(ctx)
@@ -569,7 +585,9 @@ func TestClient_CurrentRepo_NoRemote(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	runGitCommand(t, "init")
 
@@ -602,7 +620,9 @@ func TestClient_Pull_Error(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	runGitCommand(t, "init")
 	runGitCommand(t, "config", "user.email", "test@example.com")
@@ -637,7 +657,9 @@ func TestClient_Push_Error(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	runGitCommand(t, "init")
 	runGitCommand(t, "config", "user.email", "test@example.com")
@@ -672,7 +694,9 @@ func TestClient_Checkout_Error(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	runGitCommand(t, "init")
 	runGitCommand(t, "config", "user.email", "test@example.com")
@@ -707,7 +731,9 @@ func TestClient_DeleteBranch_Error(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	runGitCommand(t, "init")
 	runGitCommand(t, "config", "user.email", "test@example.com")
@@ -795,7 +821,9 @@ func TestClient_ResultMethods_Error(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
-	os.Chdir(tmpDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
 
 	result := client.CurrentBranchResult(ctx)
 	if result.IsSuccess() {
